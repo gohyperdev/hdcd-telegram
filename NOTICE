@@ -1,0 +1,25 @@
+HyperDev Channels
+Copyright 2026 Maciej Ostaszewski / HyperDev P.S.A.
+
+This product includes software developed by:
+
+- The Tokio Project (https://tokio.rs) — MIT License
+- Axum web framework (https://github.com/tokio-rs/axum) — MIT License
+- reqwest HTTP client (https://github.com/seanmonstar/reqwest) — MIT/Apache-2.0
+- ring cryptography (https://github.com/briansmith/ring) — ISC-style license,
+  includes code derived from BoringSSL and OpenSSL
+- serde serialization (https://serde.rs) — MIT/Apache-2.0
+- clap argument parser (https://clap.rs) — MIT/Apache-2.0
+
+Optional runtime dependencies (not compiled into the binary):
+- OpenAI Whisper (https://github.com/openai/whisper) — MIT License
+- ffmpeg (https://ffmpeg.org) — LGPL/GPL (called as subprocess only)
+
+This software implements the claude/channel capability of the Model Context
+Protocol (https://modelcontextprotocol.io) and is designed to interoperate
+with Claude Code (https://code.claude.com) by Anthropic.
+
+The hdcd-telegram binary is a clean-room reimplementation of the Telegram
+channel functionality. It is format-compatible with the official
+telegram@claude-plugins-official plugin (Apache-2.0, Anthropic) but shares
+no source code.

@@ -1,0 +1,36 @@
+[package]
+name = "hdcd-telegram"
+version = "0.1.0"
+edition = "2021"
+description = "Rust drop-in replacement for the official Bun-based Telegram channel plugin for Claude Code. 3.5 MB binary, ~5 MB RAM, <50ms startup."
+license = "Apache-2.0"
+repository = "https://github.com/gohyperdev/hdcd-telegram"
+readme = "README.md"
+keywords = ["mcp", "claude", "telegram", "agents", "channel"]
+categories = ["command-line-utilities", "network-programming"]
+
+[dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-std", "io-util", "net", "fs", "sync", "signal", "time", "process"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+reqwest = { version = "0.12", features = ["json", "stream", "multipart"] }
+futures-util = "0.3"
+rand = "0.8"
+tokio-util = "0.7"
+regex-lite = "0.1"
+hex = "0.4"
+dirs = "6"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["test-util"] }
+tempfile = "3"
+
+[profile.release]
+lto = "thin"
+strip = "symbols"
+codegen-units = 1
