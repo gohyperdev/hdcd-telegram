@@ -8,7 +8,7 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use std::time::Instant;
 
 use serde_json::{json, Value};
@@ -60,7 +60,10 @@ pub struct HandlerContext {
 fn permission_reply_match(text: &str) -> Option<(bool, String)> {
     // Matches: y/yes/n/no followed by exactly 5 lowercase letters (a-k, m-z).
     let trimmed = text.trim();
-    let re = regex_lite::Regex::new(r"(?i)^\s*(y|yes|n|no)\s+([a-km-z]{5})\s*$").unwrap();
+    static RE: LazyLock<regex_lite::Regex> = LazyLock::new(|| {
+        regex_lite::Regex::new(r"(?i)^\s*(y|yes|n|no)\s+([a-km-z]{5})\s*$").unwrap()
+    });
+    let re = &*RE;
     let caps = re.captures(trimmed)?;
     let verdict = caps[1].to_lowercase();
     let allow = verdict.starts_with('y');
@@ -571,7 +574,10 @@ async fn handle_callback_query(
     let data = cb.data.as_deref()?;
 
     // Parse perm:allow:<id>, perm:deny:<id>, perm:more:<id>
-    let re = regex_lite::Regex::new(r"^perm:(allow|deny|more):([a-km-z]{5})$").unwrap();
+    static RE: LazyLock<regex_lite::Regex> = LazyLock::new(|| {
+        regex_lite::Regex::new(r"^perm:(allow|deny|more):([a-km-z]{5})$").unwrap()
+    });
+    let re = &*RE;
     let caps = match re.captures(data) {
         Some(c) => c,
         None => {

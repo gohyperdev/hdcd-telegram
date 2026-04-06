@@ -1,15 +1,15 @@
-HyperDev Channels
+hdcd-telegram
 Copyright 2026 Maciej Ostaszewski / HyperDev P.S.A.
 
 This product includes software developed by:
 
 - The Tokio Project (https://tokio.rs) — MIT License
-- Axum web framework (https://github.com/tokio-rs/axum) — MIT License
 - reqwest HTTP client (https://github.com/seanmonstar/reqwest) — MIT/Apache-2.0
 - ring cryptography (https://github.com/briansmith/ring) — ISC-style license,
   includes code derived from BoringSSL and OpenSSL
 - serde serialization (https://serde.rs) — MIT/Apache-2.0
-- clap argument parser (https://clap.rs) — MIT/Apache-2.0
+- chrono date/time (https://github.com/chronotope/chrono) — MIT/Apache-2.0
+- uuid (https://github.com/uuid-rs/uuid) — MIT/Apache-2.0
 
 Optional runtime dependencies (not compiled into the binary):
 - OpenAI Whisper (https://github.com/openai/whisper) — MIT License

@@ -118,7 +118,13 @@ fn load_token(state_dir: &std::path::Path) -> Result<String> {
             .with_context(|| format!("read {}", env_file.display()))?;
         for line in content.lines() {
             if let Some(rest) = line.strip_prefix("TELEGRAM_BOT_TOKEN=") {
-                let token = rest.trim().to_string();
+                // Strip surrounding quotes (common footgun when copying from other tools).
+                let trimmed = rest.trim();
+                let token = trimmed
+                    .strip_prefix('"').and_then(|s| s.strip_suffix('"'))
+                    .or_else(|| trimmed.strip_prefix('\'').and_then(|s| s.strip_suffix('\'')))
+                    .unwrap_or(trimmed)
+                    .to_string();
                 if !token.is_empty() {
                     return Ok(token);
                 }
