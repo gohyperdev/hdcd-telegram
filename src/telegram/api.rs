@@ -62,13 +62,18 @@ impl BotApi {
     }
 
     fn url(&self, method: &str) -> String {
-        format!("https://api.telegram.org/bot{}/{}", self.token.token_str(), method)
+        format!(
+            "https://api.telegram.org/bot{}/{}",
+            self.token.token_str(),
+            method
+        )
     }
 
     fn file_url(&self, file_path: &str) -> String {
         format!(
             "https://api.telegram.org/file/bot{}/{}",
-            self.token.token_str(), file_path
+            self.token.token_str(),
+            file_path
         )
     }
 
@@ -182,10 +187,7 @@ impl BotApi {
             .text("chat_id", chat_id.to_string())
             .part("photo", part);
         if let Some(rt) = reply_to {
-            form = form.text(
-                "reply_parameters",
-                json!({ "message_id": rt }).to_string(),
-            );
+            form = form.text("reply_parameters", json!({ "message_id": rt }).to_string());
         }
 
         let resp: SendMessageResponse = self
@@ -199,10 +201,7 @@ impl BotApi {
             .await
             .context("sendPhoto parse")?;
         if !resp.ok {
-            bail!(
-                "sendPhoto failed: {}",
-                resp.description.unwrap_or_default()
-            );
+            bail!("sendPhoto failed: {}", resp.description.unwrap_or_default());
         }
         resp.result.context("sendPhoto: missing result")
     }
@@ -226,10 +225,7 @@ impl BotApi {
             .text("chat_id", chat_id.to_string())
             .part("document", part);
         if let Some(rt) = reply_to {
-            form = form.text(
-                "reply_parameters",
-                json!({ "message_id": rt }).to_string(),
-            );
+            form = form.text("reply_parameters", json!({ "message_id": rt }).to_string());
         }
 
         let resp: SendMessageResponse = self
@@ -372,9 +368,7 @@ impl BotApi {
             let chunk = chunk.context("download stream chunk")?;
             buf.extend_from_slice(&chunk);
             if buf.len() as u64 > MAX_DOWNLOAD_BYTES {
-                bail!(
-                    "file too large: exceeded 20MB download limit while streaming"
-                );
+                bail!("file too large: exceeded 20MB download limit while streaming");
             }
         }
         Ok(buf)

@@ -12,16 +12,12 @@ use tracing::warn;
 
 use super::access;
 use super::api::BotApi;
-use super::types::InlineKeyboardMarkup;
 use super::types::InlineKeyboardButton;
+use super::types::InlineKeyboardMarkup;
 
 /// Handle a `notifications/claude/channel/permission_request` from Claude Code.
 /// Sends an inline keyboard to all allowFrom DMs.
-pub async fn handle_permission_request(
-    params: &Value,
-    api: &Arc<BotApi>,
-    state_dir: &Path,
-) {
+pub async fn handle_permission_request(params: &Value, api: &Arc<BotApi>, state_dir: &Path) {
     let request_id = match params.get("request_id").and_then(|v| v.as_str()) {
         Some(id) => id,
         None => return,

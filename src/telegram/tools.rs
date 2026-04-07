@@ -140,8 +140,7 @@ async fn handle_reply(args: &Value, api: &BotApi, state_dir: &Path) -> Result<Va
     // Validate files.
     for f in &files {
         assert_sendable(f, state_dir)?;
-        let meta = std::fs::metadata(f)
-            .map_err(|e| anyhow::anyhow!("cannot stat {f}: {e}"))?;
+        let meta = std::fs::metadata(f).map_err(|e| anyhow::anyhow!("cannot stat {f}: {e}"))?;
         if meta.len() > handlers::MAX_ATTACHMENT_BYTES {
             anyhow::bail!(
                 "file too large: {f} ({:.1}MB, max 50MB)",
@@ -151,9 +150,16 @@ async fn handle_reply(args: &Value, api: &BotApi, state_dir: &Path) -> Result<Va
     }
 
     let access_data = access::load_access(state_dir);
-    let sent_ids =
-        handlers::send_reply(api, &access_data, chat_id, text, reply_to, &files, parse_mode)
-            .await?;
+    let sent_ids = handlers::send_reply(
+        api,
+        &access_data,
+        chat_id,
+        text,
+        reply_to,
+        &files,
+        parse_mode,
+    )
+    .await?;
 
     let result = if sent_ids.len() == 1 {
         format!("sent (id: {})", sent_ids[0])
@@ -185,8 +191,7 @@ async fn handle_react(args: &Value, api: &BotApi, state_dir: &Path) -> Result<Va
         .ok_or_else(|| anyhow::anyhow!("missing emoji"))?;
 
     access::assert_allowed_chat(state_dir, chat_id)?;
-    api.set_message_reaction(chat_id, message_id, emoji)
-        .await?;
+    api.set_message_reaction(chat_id, message_id, emoji).await?;
     Ok(json!({ "content": [{ "type": "text", "text": "reacted" }] }))
 }
 
@@ -196,10 +201,9 @@ async fn handle_download(args: &Value, api: &BotApi, inbox_dir: &Path) -> Result
         .ok_or_else(|| anyhow::anyhow!("missing file_id"))?;
 
     let file = api.get_file(file_id).await?;
-    let file_path = file
-        .file_path
-        .as_deref()
-        .ok_or_else(|| anyhow::anyhow!("Telegram returned no file_path -- file may have expired"))?;
+    let file_path = file.file_path.as_deref().ok_or_else(|| {
+        anyhow::anyhow!("Telegram returned no file_path -- file may have expired")
+    })?;
 
     let bytes = api.download_file(file_path).await?;
 
@@ -269,7 +273,9 @@ async fn handle_edit(args: &Value, api: &BotApi, state_dir: &Path) -> Result<Val
     let msg = api
         .edit_message_text(chat_id, message_id, text, parse_mode)
         .await?;
-    Ok(json!({ "content": [{ "type": "text", "text": format!("edited (id: {})", msg.message_id) }] }))
+    Ok(
+        json!({ "content": [{ "type": "text", "text": format!("edited (id: {})", msg.message_id) }] }),
+    )
 }
 
 /// Prevent sending files from the state directory (except inbox).

@@ -29,10 +29,8 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, Stdout};
 use tokio::sync::Mutex;
 use tracing::{debug, error, info, warn};
 
-use hdcd_telegram::telegram::{
-    api, handlers, permission, polling, tools, transcribe, types,
-};
 use hdcd_telegram::telegram::api::BotCommand;
+use hdcd_telegram::telegram::{api, handlers, permission, polling, tools, transcribe, types};
 
 /// MCP protocol version.
 const MCP_PROTOCOL_VERSION: &str = "2024-11-05";
@@ -81,8 +79,7 @@ fn state_dir() -> Result<PathBuf> {
             .join("channels")
             .join("telegram")
     };
-    std::fs::create_dir_all(&dir)
-        .with_context(|| format!("create state dir {}", dir.display()))?;
+    std::fs::create_dir_all(&dir).with_context(|| format!("create state dir {}", dir.display()))?;
     Ok(dir)
 }
 
@@ -121,8 +118,13 @@ fn load_token(state_dir: &std::path::Path) -> Result<String> {
                 // Strip surrounding quotes (common footgun when copying from other tools).
                 let trimmed = rest.trim();
                 let token = trimmed
-                    .strip_prefix('"').and_then(|s| s.strip_suffix('"'))
-                    .or_else(|| trimmed.strip_prefix('\'').and_then(|s| s.strip_suffix('\'')))
+                    .strip_prefix('"')
+                    .and_then(|s| s.strip_suffix('"'))
+                    .or_else(|| {
+                        trimmed
+                            .strip_prefix('\'')
+                            .and_then(|s| s.strip_suffix('\''))
+                    })
                     .unwrap_or(trimmed)
                     .to_string();
                 if !token.is_empty() {
@@ -173,7 +175,10 @@ async fn main() -> Result<()> {
     let bot_api = Arc::new(api::BotApi::new(&token));
 
     // Get bot info.
-    let me = bot_api.get_me().await.context("getMe failed -- check TELEGRAM_BOT_TOKEN")?;
+    let me = bot_api
+        .get_me()
+        .await
+        .context("getMe failed -- check TELEGRAM_BOT_TOKEN")?;
     let bot_username = me.username.unwrap_or_default();
     info!(username = %bot_username, "telegram bot identified");
 
@@ -300,10 +305,9 @@ async fn main() -> Result<()> {
                         }),
                     )
                 }
-                "tools/list" => ok_response(
-                    req_id.clone(),
-                    json!({ "tools": tools::tool_schemas() }),
-                ),
+                "tools/list" => {
+                    ok_response(req_id.clone(), json!({ "tools": tools::tool_schemas() }))
+                }
                 "tools/call" => {
                     let name = params
                         .as_ref()
@@ -333,7 +337,11 @@ async fn main() -> Result<()> {
                 }
                 other => {
                     debug!(method = other, "unimplemented request method");
-                    error_response(req_id.clone(), -32601, &format!("method not found: {other}"))
+                    error_response(
+                        req_id.clone(),
+                        -32601,
+                        &format!("method not found: {other}"),
+                    )
                 }
             };
             if let Err(e) = write_frame(&stdout, &resp).await {

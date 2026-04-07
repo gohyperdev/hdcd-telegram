@@ -74,10 +74,7 @@ fn permission_reply_match(text: &str) -> Option<(bool, String)> {
 /// Process a single Telegram update. Returns a JSON-RPC notification frame
 /// to write to stdout, or `None` if the message should be dropped or handled
 /// internally (pairing, permission relay, commands).
-pub async fn process_update(
-    update: &Update,
-    ctx: &HandlerContext,
-) -> Option<Vec<Value>> {
+pub async fn process_update(update: &Update, ctx: &HandlerContext) -> Option<Vec<Value>> {
     // Handle callback queries (permission inline buttons).
     if let Some(cb) = &update.callback_query {
         return handle_callback_query(cb, ctx).await;
@@ -124,9 +121,8 @@ pub async fn process_update(
             } else {
                 "Pairing required"
             };
-            let text = format!(
-                "{lead} \u{2014} run in Claude Code:\n\n/telegram:access pair {code}"
-            );
+            let text =
+                format!("{lead} \u{2014} run in Claude Code:\n\n/telegram:access pair {code}");
             if let Err(e) = ctx
                 .api
                 .send_message(&chat_id, &text, None, None, None)
@@ -136,9 +132,7 @@ pub async fn process_update(
             }
             None
         }
-        GateResult::Deliver { access } => {
-            handle_deliver(msg, &access, ctx).await
-        }
+        GateResult::Deliver { access } => handle_deliver(msg, &access, ctx).await,
     }
 }
 
@@ -182,10 +176,7 @@ async fn handle_deliver(
         });
         // React with checkmark / cross.
         let emoji = if allow { "\u{2705}" } else { "\u{274c}" };
-        let _ = ctx
-            .api
-            .set_message_reaction(&chat_id, msg_id, emoji)
-            .await;
+        let _ = ctx.api.set_message_reaction(&chat_id, msg_id, emoji).await;
         return Some(vec![frame]);
     }
 
@@ -212,10 +203,7 @@ async fn handle_deliver(
     meta.insert("message_id".into(), json!(msg_id.to_string()));
     meta.insert(
         "user".into(),
-        json!(from
-            .username
-            .as_deref()
-            .unwrap_or(&from.id.to_string())),
+        json!(from.username.as_deref().unwrap_or(&from.id.to_string())),
     );
     meta.insert("user_id".into(), json!(from.id.to_string()));
     meta.insert(
@@ -264,9 +252,10 @@ fn extract_content(msg: &Message) -> (String, Option<AttachmentMeta>, bool) {
     }
     if let Some(doc) = &msg.document {
         let name = doc.file_name.as_deref().map(access::safe_name);
-        let text = msg.caption.clone().unwrap_or_else(|| {
-            format!("(document: {})", name.as_deref().unwrap_or("file"))
-        });
+        let text = msg
+            .caption
+            .clone()
+            .unwrap_or_else(|| format!("(document: {})", name.as_deref().unwrap_or("file")));
         return (
             text,
             Some(AttachmentMeta {
@@ -391,11 +380,7 @@ async fn download_photo_from_message(msg: &Message, ctx: &HandlerContext) -> Opt
                     } else {
                         sanitized_id
                     };
-                    let name = format!(
-                        "{}-{}.{ext}",
-                        epoch_ms(),
-                        sanitized_id
-                    );
+                    let name = format!("{}-{}.{ext}", epoch_ms(), sanitized_id);
                     let path = ctx.inbox_dir.join(&name);
                     if let Err(e) = std::fs::create_dir_all(&ctx.inbox_dir) {
                         error!(error = %e, "failed to create inbox dir");
@@ -471,9 +456,7 @@ fn check_mention(msg: &Message, bot_username: &str) -> bool {
         }
         if e.kind == "text_mention" {
             if let Some(ref user) = e.user {
-                if user.is_bot == Some(true)
-                    && user.username.as_deref() == Some(bot_username)
-                {
+                if user.is_bot == Some(true) && user.username.as_deref() == Some(bot_username) {
                     return true;
                 }
             }
@@ -511,14 +494,20 @@ async fn handle_command(msg: &Message, text: &str, ctx: &HandlerContext) {
                  After that, DMs here reach that session."
                     .to_string()
             };
-            let _ = ctx.api.send_message(&chat_id, &reply, None, None, None).await;
+            let _ = ctx
+                .api
+                .send_message(&chat_id, &reply, None, None, None)
+                .await;
         }
         "/help" => {
             let reply = "Messages you send here route to a paired Claude Code session. \
                          Text and photos are forwarded; replies and reactions come back.\n\n\
                          /start \u{2014} pairing instructions\n\
                          /status \u{2014} check your pairing state";
-            let _ = ctx.api.send_message(&chat_id, reply, None, None, None).await;
+            let _ = ctx
+                .api
+                .send_message(&chat_id, reply, None, None, None)
+                .await;
         }
         "/status" => {
             let from = match msg.from.as_ref() {
@@ -552,7 +541,10 @@ async fn handle_command(msg: &Message, text: &str, ctx: &HandlerContext) {
                     "Not paired. Send me a message to get a pairing code.".to_string()
                 }
             };
-            let _ = ctx.api.send_message(&chat_id, &reply, None, None, None).await;
+            let _ = ctx
+                .api
+                .send_message(&chat_id, &reply, None, None, None)
+                .await;
         }
         _ => {
             // Unknown command — ignore silently.
@@ -624,10 +616,7 @@ async fn handle_callback_query(
     } else {
         "\u{274c} Denied"
     };
-    let _ = ctx
-        .api
-        .answer_callback_query(&cb.id, Some(label))
-        .await;
+    let _ = ctx.api.answer_callback_query(&cb.id, Some(label)).await;
 
     // Update the message to show the outcome.
     if let Some(ref cb_msg) = cb.message {
@@ -663,10 +652,9 @@ async fn handle_voice_transcription(
 
     if !ctx.transcribe_support.available {
         // Whisper not installed — update text with a note.
-        *text = msg
-            .caption
-            .clone()
-            .unwrap_or_else(|| "(voice message \u{2014} transcription unavailable, install whisper + ffmpeg)".into());
+        *text = msg.caption.clone().unwrap_or_else(|| {
+            "(voice message \u{2014} transcription unavailable, install whisper + ffmpeg)".into()
+        });
         return None;
     }
 
@@ -686,10 +674,7 @@ async fn handle_voice_transcription(
         Ok(t) => t,
         Err(e) => {
             warn!(error = %e, "voice transcription failed");
-            *text = format!(
-                "(voice message \u{2014} transcription failed: {})",
-                e
-            );
+            *text = format!("(voice message \u{2014} transcription failed: {})", e);
             // Clean up downloaded file.
             let _ = tokio::fs::remove_file(&ogg_path).await;
             return None;
@@ -775,10 +760,7 @@ async fn check_transcription_confirmation(
     // Build the channel notification frame.
     let mut meta = serde_json::Map::new();
     meta.insert("chat_id".into(), json!(pending.chat_id));
-    meta.insert(
-        "message_id".into(),
-        json!(pending.original_message_id),
-    );
+    meta.insert("message_id".into(), json!(pending.original_message_id));
     meta.insert("user_id".into(), json!(pending.user_id));
     if let Some(ref att) = pending.attachment_meta {
         meta.insert("attachment_kind".into(), json!(att.kind));
@@ -804,10 +786,7 @@ async fn check_transcription_confirmation(
 }
 
 /// Download a voice file from Telegram to a local temp path.
-async fn download_voice_file(
-    file_id: &str,
-    ctx: &HandlerContext,
-) -> anyhow::Result<PathBuf> {
+async fn download_voice_file(file_id: &str, ctx: &HandlerContext) -> anyhow::Result<PathBuf> {
     let file = ctx.api.get_file(file_id).await?;
     let file_path = file
         .file_path
@@ -857,10 +836,7 @@ pub fn spawn_transcription_expiry(
                     user_id = %pending.user_id,
                     "pending transcription timed out, emitting as-is"
                 );
-                let content = format!(
-                    "{} (auto-confirmed after timeout)",
-                    pending.transcription
-                );
+                let content = format!("{} (auto-confirmed after timeout)", pending.transcription);
                 let mut meta = serde_json::Map::new();
                 meta.insert("chat_id".into(), json!(pending.chat_id));
                 meta.insert("message_id".into(), json!(pending.original_message_id));
@@ -919,10 +895,7 @@ pub async fn send_reply(
     files: &[String],
     parse_mode: Option<&str>,
 ) -> anyhow::Result<Vec<i64>> {
-    let limit = access
-        .text_chunk_limit
-        .unwrap_or(4096)
-        .clamp(1, 4096);
+    let limit = access.text_chunk_limit.unwrap_or(4096).clamp(1, 4096);
     let mode = access.chunk_mode.unwrap_or(ChunkMode::Length);
     let reply_mode = access.reply_to_mode.unwrap_or(ReplyToMode::First);
 

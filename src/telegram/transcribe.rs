@@ -135,10 +135,7 @@ fn find_executable(name: &str) -> Option<String> {
 /// 4. Cleans up temp files.
 ///
 /// Timeout: 60 seconds per step.
-pub async fn transcribe(
-    ogg_path: &Path,
-    config: &TranscribeConfig,
-) -> Result<String> {
+pub async fn transcribe(ogg_path: &Path, config: &TranscribeConfig) -> Result<String> {
     let temp_dir = std::env::temp_dir();
     let id = uuid::Uuid::new_v4();
     let wav_path = temp_dir.join(format!("hdcd-voice-{id}.wav"));

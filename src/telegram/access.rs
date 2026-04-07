@@ -192,9 +192,7 @@ pub fn gate(
 
     match chat_type {
         "private" => gate_private(state_dir, &mut access, sender_id, chat_id),
-        "group" | "supergroup" => {
-            gate_group(&access, sender_id, chat_id, is_mentioned)
-        }
+        "group" | "supergroup" => gate_group(&access, sender_id, chat_id, is_mentioned),
         _ => GateResult::Drop,
     }
 }
@@ -254,12 +252,7 @@ fn gate_private(
     }
 }
 
-fn gate_group(
-    access: &Access,
-    sender_id: &str,
-    chat_id: &str,
-    is_mentioned: bool,
-) -> GateResult {
+fn gate_group(access: &Access, sender_id: &str, chat_id: &str, is_mentioned: bool) -> GateResult {
     let policy = match access.groups.get(chat_id) {
         Some(p) => p,
         None => return GateResult::Drop,
