@@ -157,6 +157,68 @@ If whisper or ffmpeg are not installed, voice messages are forwarded as `"(voice
 - **Sendable-file gate**: prevents Claude from exfiltrating the plugin's own state directory via file attachments.
 - **No network listeners**: communicates exclusively via stdio (JSON-RPC 2.0) and outbound HTTPS to `api.telegram.org`. No ports opened.
 
+## Pre-built binaries: trust and verification
+
+Pre-built binaries are published on the [GitHub Releases](https://github.com/gohyperdev/hdcd-telegram/releases) page for Linux (x86_64, ARM64), macOS (Intel, Apple Silicon), and Windows.
+
+### Verifying downloads
+
+Every release includes a `SHA256SUMS.txt` file and per-archive `.sha256` files. After downloading:
+
+```bash
+shasum -a 256 -c SHA256SUMS.txt
+```
+
+This confirms the file you downloaded matches what the CI pipeline produced. The checksums are generated in GitHub Actions, so they are only as trustworthy as the CI pipeline itself. For maximum assurance, build from source.
+
+### VirusTotal
+
+[VirusTotal](https://www.virustotal.com) is a free service by Google that scans files against 70+ antivirus engines simultaneously. If you downloaded a binary and want to verify it is clean, upload it to [virustotal.com](https://www.virustotal.com) before running it. We encourage this -- there is nothing to hide.
+
+You can also check the SHA256 hash directly: go to virustotal.com, click "Search", and paste the SHA256 from `SHA256SUMS.txt`. If someone has already scanned that exact file, you will see the results without re-uploading.
+
+### macOS Gatekeeper
+
+macOS blocks unsigned binaries downloaded from the internet. After extracting, you will see:
+
+> "hdcd-telegram" can't be opened because Apple cannot check it for malicious software.
+
+This happens because the binary is not signed with an Apple Developer ID certificate ($99/year). To allow it:
+
+```bash
+xattr -d com.apple.quarantine ./hdcd-telegram
+```
+
+Or: System Settings > Privacy & Security > scroll down > "Allow Anyway".
+
+### Windows SmartScreen
+
+Windows may show a "Windows protected your PC" warning for unsigned executables. Click "More info" > "Run anyway". This happens because the binary is not signed with an Authenticode certificate.
+
+### Building from source (recommended for production)
+
+If you prefer not to trust pre-built binaries:
+
+```bash
+git clone https://github.com/gohyperdev/hdcd-telegram.git
+cd hdcd-telegram
+cargo build --release
+# Binary: target/release/hdcd-telegram
+```
+
+This way you control the entire build chain. Requires Rust 1.80+.
+
+### Roadmap to signed releases
+
+| Level | Status | Description |
+|---|---|---|
+| SHA256 checksums | Done | Every release includes checksums |
+| VirusTotal | Manual | We encourage users to verify on virustotal.com |
+| Apple code signing + notarization | Planned | Eliminates macOS Gatekeeper warning |
+| Windows Authenticode signing | Planned | Eliminates SmartScreen warning |
+| GPG-signed releases | Planned | Cryptographic proof of publisher identity |
+| Reproducible builds | Planned | Anyone can verify binary matches source |
+
 ## Acknowledgements
 
 - [Claude Code](https://code.claude.com) by Anthropic -- the `claude/channel` MCP capability this project builds on
