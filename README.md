@@ -29,7 +29,24 @@ The official plugin activation path has [multiple open bugs](https://github.com/
 
 **The workaround**: register the server in `.mcp.json` and launch with `--dangerously-load-development-channels server:telegram` instead of `--channels plugin:telegram@claude-plugins-official`. This activates channel routing through a different code path that works reliably.
 
-## Quick start
+## Install via Claude Code plugin marketplace
+
+The easiest way to install is through our plugin marketplace:
+
+```
+/plugin marketplace add gohyperdev/hyperdev-claude-plugins
+/plugin install hdcd-telegram@hyperdev-plugins
+```
+
+Then configure and launch:
+```
+/hdcd-telegram:configure <your-bot-token>
+claude --channels plugin:hdcd-telegram@hyperdev-plugins
+```
+
+> **Note:** The `--channels` path is currently gated by a server-side feature flag on Anthropic's side. If it doesn't work for your account, use the manual setup below with `--dangerously-load-development-channels` as a workaround.
+
+## Manual setup
 
 ### 1. Get the binary
 
@@ -173,23 +190,39 @@ No ports opened. No webhooks. Everything runs locally over stdio + outbound HTTP
 
 ## Troubleshooting
 
+### Authentication: channels require claude.ai OAuth
+
+**Channels only work with claude.ai OAuth authentication.** API keys and Anthropic Console authentication do not work -- channel registration silently fails and inbound messages are never delivered.
+
+If you're running in Docker, CI, or any headless environment, make sure you're logged in via the OAuth flow:
+
+```bash
+claude login
+```
+
+Verify your auth method:
+```bash
+claude config get authMethod
+# Should return "oauth", not "apiKey"
+```
+
+This is the most common hidden blocker -- if everything looks correct but messages don't arrive, check your auth method first.
+
 ### "Channels are not currently available"
 
 This is a Claude Code issue, not a plugin issue. The `--dangerously-load-development-channels` flag should bypass this. If it doesn't:
 
-1. **Check Claude Code version**: run `claude --version`. Versions before 2.1.90 may not support the flag correctly.
-2. **Check your auth**: some features require claude.ai OAuth (not API key).
+1. **Check your auth method**: must be claude.ai OAuth (see above).
+2. **Check Claude Code version**: run `claude --version`. Versions before 2.1.90 may not support the flag correctly.
 3. **Check `.mcp.json` is loaded**: the telegram server must appear in the MCP server list at startup.
 
 ### Bot shows "typing" but never replies
 
-The plugin is receiving your message and forwarding it to Claude Code, but Claude Code isn't routing it into the conversation. This means:
+The plugin is receiving your message and forwarding it to Claude Code, but Claude Code isn't routing it into the conversation.
 
-1. **The MCP server is working** (good)
-2. **The channel notification is being sent** (good)
-3. **Claude Code is not processing the inbound notification** (the bug)
+**Most likely cause: wrong auth method.** Channels require claude.ai OAuth -- if you're using an API key, the MCP server works (typing indicator) but channel notifications are silently dropped. See [Authentication](#authentication-channels-require-claudeai-oauth) above.
 
-Check:
+If auth is correct, check:
 - Are you using `--dangerously-load-development-channels server:telegram`? (Not `--channels plugin:...`)
 - Is the startup output showing the channel as active (not "ignored")?
 - Try restarting Claude Code -- some sessions lose channel routing after the first turn
