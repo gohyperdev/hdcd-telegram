@@ -74,6 +74,8 @@ echo "TELEGRAM_BOT_TOKEN=123456789:AAH..." > ~/.claude/channels/telegram/.env
 chmod 600 ~/.claude/channels/telegram/.env
 ```
 
+> **How hdcd-telegram finds the token:** On startup, the binary automatically reads `TELEGRAM_BOT_TOKEN` from `~/.claude/channels/telegram/.env`. This is the same location the official Telegram plugin uses — no extra wiring needed. If you need a custom location, set the `TELEGRAM_STATE_DIR` environment variable (see [Configuration](#configuration)).
+
 ### 3. Configure the bot for groups (important)
 
 > **This step is critical if you want the bot to work in group chats.** By default, Telegram bots in "privacy mode" only see messages that start with `/` or explicitly @mention the bot. You must disable privacy mode so the bot can see all messages in the group.
@@ -110,6 +112,23 @@ Add to your project's `.mcp.json` (or `~/.claude.json` for global):
 
 Replace `/path/to/hdcd-telegram` with the actual path to the binary (e.g. `./hdcd-telegram`, `/usr/local/bin/hdcd-telegram`, or the full path to `target/release/hdcd-telegram`).
 
+> **No token in `.mcp.json`!** You do NOT pass the bot token here. The binary reads it automatically from `~/.claude/channels/telegram/.env` (see step 2). The `.mcp.json` only tells Claude Code how to start the binary.
+>
+> If you want to pass the token explicitly (e.g. in CI), you can use the `env` field:
+> ```json
+> {
+>   "mcpServers": {
+>     "telegram": {
+>       "command": "/path/to/hdcd-telegram",
+>       "args": [],
+>       "env": {
+>         "TELEGRAM_BOT_TOKEN": "123456789:AAH..."
+>       }
+>     }
+>   }
+> }
+> ```
+
 ### 5. Launch Claude Code
 
 ```bash
@@ -132,6 +151,25 @@ DM your bot on Telegram. It replies with a 6-character pairing code. In your Cla
 ```
 
 Done. Your next DM reaches Claude.
+
+### How it all connects
+
+```
+┌─────────────┐     ┌──────────────────┐     ┌────────────┐
+│  Telegram    │────▶│  hdcd-telegram   │────▶│ Claude Code│
+│  (user DM)  │◀────│  (MCP server)    │◀────│ (session)  │
+└─────────────┘     └──────────────────┘     └────────────┘
+                    reads on startup:
+                    ~/.claude/channels/telegram/.env     ← bot token
+                    ~/.claude/channels/telegram/access.json ← who's allowed
+```
+
+1. **Claude Code** reads `.mcp.json`, starts `hdcd-telegram` as an MCP subprocess (stdio)
+2. **hdcd-telegram** reads the bot token from `~/.claude/channels/telegram/.env` and starts polling Telegram
+3. Incoming Telegram message → hdcd-telegram sends `notifications/claude/channel` via JSON-RPC → Claude sees it as a `<channel>` tag
+4. Claude replies via the `reply` MCP tool → hdcd-telegram sends it back to Telegram
+
+No ports opened. No webhooks. Everything runs locally over stdio + outbound HTTPS to `api.telegram.org`.
 
 ## Troubleshooting
 
