@@ -84,10 +84,19 @@ fn state_dir() -> Result<PathBuf> {
 }
 
 /// Load the bot token from env or the `.env` file in the state directory.
+///
+/// Checks in priority order:
+/// 1. `HDCD_TELEGRAM_BOT_TOKEN` env var (preferred, avoids conflict with official plugin)
+/// 2. `TELEGRAM_BOT_TOKEN` env var (backward compatible)
+/// 3. `HDCD_TELEGRAM_BOT_TOKEN=` line in `.env` file
+/// 4. `TELEGRAM_BOT_TOKEN=` line in `.env` file (backward compatible)
 fn load_token(state_dir: &std::path::Path) -> Result<String> {
-    if let Ok(token) = std::env::var("TELEGRAM_BOT_TOKEN") {
-        if !token.is_empty() {
-            return Ok(token);
+    // Check env vars: HDCD_TELEGRAM_BOT_TOKEN takes priority over TELEGRAM_BOT_TOKEN
+    for var_name in ["HDCD_TELEGRAM_BOT_TOKEN", "TELEGRAM_BOT_TOKEN"] {
+        if let Ok(token) = std::env::var(var_name) {
+            if !token.is_empty() {
+                return Ok(token);
+            }
         }
     }
 
@@ -113,29 +122,34 @@ fn load_token(state_dir: &std::path::Path) -> Result<String> {
 
         let content = std::fs::read_to_string(&env_file)
             .with_context(|| format!("read {}", env_file.display()))?;
-        for line in content.lines() {
-            if let Some(rest) = line.strip_prefix("TELEGRAM_BOT_TOKEN=") {
-                // Strip surrounding quotes (common footgun when copying from other tools).
-                let trimmed = rest.trim();
-                let token = trimmed
-                    .strip_prefix('"')
-                    .and_then(|s| s.strip_suffix('"'))
-                    .or_else(|| {
-                        trimmed
-                            .strip_prefix('\'')
-                            .and_then(|s| s.strip_suffix('\''))
-                    })
-                    .unwrap_or(trimmed)
-                    .to_string();
-                if !token.is_empty() {
-                    return Ok(token);
+        // HDCD_TELEGRAM_BOT_TOKEN takes priority over TELEGRAM_BOT_TOKEN in .env too
+        for prefix in ["HDCD_TELEGRAM_BOT_TOKEN=", "TELEGRAM_BOT_TOKEN="] {
+            for line in content.lines() {
+                if let Some(rest) = line.strip_prefix(prefix) {
+                    // Strip surrounding quotes (common footgun when copying from other tools).
+                    let trimmed = rest.trim();
+                    let token = trimmed
+                        .strip_prefix('"')
+                        .and_then(|s| s.strip_suffix('"'))
+                        .or_else(|| {
+                            trimmed
+                                .strip_prefix('\'')
+                                .and_then(|s| s.strip_suffix('\''))
+                        })
+                        .unwrap_or(trimmed)
+                        .to_string();
+                    if !token.is_empty() {
+                        return Ok(token);
+                    }
                 }
             }
         }
     }
 
     bail!(
-        "TELEGRAM_BOT_TOKEN required\n  set in env or {}\n  format: TELEGRAM_BOT_TOKEN=123456789:AAH...",
+        "Bot token required — set HDCD_TELEGRAM_BOT_TOKEN (or TELEGRAM_BOT_TOKEN for backward compatibility)\n  \
+         in env or {}\n  \
+         format: HDCD_TELEGRAM_BOT_TOKEN=123456789:AAH...",
         state_dir.join(".env").display()
     )
 }

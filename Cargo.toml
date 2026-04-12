@@ -1,6 +1,6 @@
 [package]
 name = "hdcd-telegram"
-version = "0.1.0"
+version = "0.1.2"
 edition = "2021"
 description = "Rust drop-in replacement for the official Bun-based Telegram channel plugin for Claude Code. 3.5 MB binary, ~5 MB RAM, <50ms startup."
 license = "Apache-2.0"
