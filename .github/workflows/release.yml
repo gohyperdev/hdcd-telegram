@@ -70,6 +70,7 @@ jobs:
         run: |
           mkdir -p dist
           cp target/${{ matrix.target }}/release/hdcd-telegram dist/
+          cp target/${{ matrix.target }}/release/hdcd-router dist/
           cd dist && tar czf ../hdcd-telegram-${{ github.ref_name }}-${{ matrix.artifact }}.tar.gz *
 
       - name: Package (windows)
@@ -78,6 +79,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path dist
           Copy-Item target/${{ matrix.target }}/release/hdcd-telegram.exe dist/
+          Copy-Item target/${{ matrix.target }}/release/hdcd-router.exe dist/
           Compress-Archive -Path dist/* -DestinationPath hdcd-telegram-${{ github.ref_name }}-${{ matrix.artifact }}.zip
 
       - name: Generate SHA256 checksum (unix)
@@ -155,7 +157,13 @@ jobs:
             xattr -d com.apple.quarantine ./hdcd-telegram
             ```
 
-            ## Quick start
+            ## Included binaries
+
+            Each archive contains two binaries:
+            - **hdcd-telegram** — MCP server (1:1 standalone mode, or `--router` for multi-session)
+            - **hdcd-router** — multi-session router that creates Telegram forum topics per session
+
+            ## Quick start (standalone)
 
             ```bash
             tar xzf hdcd-telegram-${{ github.ref_name }}-<platform>.tar.gz
@@ -163,4 +171,20 @@ jobs:
             claude --dangerously-load-development-channels server:telegram
             ```
 
-            See [README](https://github.com/gohyperdev/hdcd-telegram#quick-start) for full setup.
+            ## Quick start (router)
+
+            ```bash
+            # 1. Configure router
+            mkdir -p ~/.claude/channels/telegram-router
+            cat > ~/.claude/channels/telegram-router/config.json << 'EOF'
+            {"bot_token":"YOUR_TOKEN","supergroup_id":"YOUR_GROUP_ID","allowed_users":["YOUR_USER_ID"]}
+            EOF
+
+            # 2. Start router (once)
+            ./hdcd-router
+
+            # 3. Launch Claude Code sessions with --router flag
+            claude --dangerously-load-development-channels server:telegram
+            ```
+
+            See [README](https://github.com/gohyperdev/hdcd-telegram#router-mode-multi-session) for full setup.

@@ -125,7 +125,7 @@ pub async fn process_update(update: &Update, ctx: &HandlerContext) -> Option<Vec
                 format!("{lead} \u{2014} run in Claude Code:\n\n/telegram:access pair {code}");
             if let Err(e) = ctx
                 .api
-                .send_message(&chat_id, &text, None, None, None)
+                .send_message(&chat_id, &text, None, None, None, None)
                 .await
             {
                 warn!(error = %e, "failed to send pairing reply");
@@ -496,7 +496,7 @@ async fn handle_command(msg: &Message, text: &str, ctx: &HandlerContext) {
             };
             let _ = ctx
                 .api
-                .send_message(&chat_id, &reply, None, None, None)
+                .send_message(&chat_id, &reply, None, None, None, None)
                 .await;
         }
         "/help" => {
@@ -506,7 +506,7 @@ async fn handle_command(msg: &Message, text: &str, ctx: &HandlerContext) {
                          /status \u{2014} check your pairing state";
             let _ = ctx
                 .api
-                .send_message(&chat_id, reply, None, None, None)
+                .send_message(&chat_id, reply, None, None, None, None)
                 .await;
         }
         "/status" => {
@@ -543,7 +543,7 @@ async fn handle_command(msg: &Message, text: &str, ctx: &HandlerContext) {
             };
             let _ = ctx
                 .api
-                .send_message(&chat_id, &reply, None, None, None)
+                .send_message(&chat_id, &reply, None, None, None, None)
                 .await;
         }
         _ => {
@@ -698,7 +698,7 @@ async fn handle_voice_transcription(
         );
         let _ = ctx
             .api
-            .send_message(chat_id, &echo_text, Some(msg.message_id), None, None)
+            .send_message(chat_id, &echo_text, Some(msg.message_id), None, None, None)
             .await;
 
         // Store pending transcription.
@@ -908,7 +908,7 @@ pub async fn send_reply(
             && (reply_mode == ReplyToMode::All || i == 0);
         let rt = if should_reply_to { reply_to } else { None };
         let msg = api
-            .send_message(chat_id, chunk, rt, parse_mode, None)
+            .send_message(chat_id, chunk, rt, parse_mode, None, None)
             .await
             .map_err(|e| {
                 anyhow::anyhow!(

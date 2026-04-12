@@ -87,19 +87,21 @@ jobs:
         if: matrix.cross
         run: cross build --release --target ${{ matrix.target }}
 
-      - name: Package binary (unix)
+      - name: Package binaries (unix)
         if: runner.os != 'Windows'
         run: |
           mkdir -p dist
           cp target/${{ matrix.target }}/release/hdcd-telegram dist/
+          cp target/${{ matrix.target }}/release/hdcd-router dist/
           cd dist && tar czf ../hdcd-telegram-${{ matrix.artifact }}.tar.gz *
 
-      - name: Package binary (windows)
+      - name: Package binaries (windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist
           Copy-Item target/${{ matrix.target }}/release/hdcd-telegram.exe dist/
+          Copy-Item target/${{ matrix.target }}/release/hdcd-router.exe dist/
           Compress-Archive -Path dist/* -DestinationPath hdcd-telegram-${{ matrix.artifact }}.zip
 
       - name: Upload artifact
