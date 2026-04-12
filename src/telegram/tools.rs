@@ -3,7 +3,8 @@
 
 //! MCP tool schemas and call handlers for the Telegram channel.
 //!
-//! Four tools: `reply`, `react`, `edit_message`, `download_attachment`.
+//! Tools: `reply`, `react`, `edit_message`, `download_attachment`,
+//! `set_topic_title` (router mode only).
 
 use std::path::Path;
 
@@ -84,6 +85,20 @@ pub fn tool_schemas() -> Value {
                 },
                 "required": ["chat_id", "message_id", "text"]
             }
+        },
+        {
+            "name": "set_topic_title",
+            "description": "Rename this session's Telegram forum topic. Call when the conversation subject becomes clear or shifts significantly \u{2014} e.g. after the first real task is understood, or when switching to a new subject. Keep titles short (2\u{2013}5 words) and descriptive so the user can find this session in their topic sidebar. Don't rename for minor follow-ups. Router mode only.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "description": "New topic name, 1\u{2013}128 characters."
+                    }
+                },
+                "required": ["title"]
+            }
         }
     ])
 }
@@ -101,6 +116,12 @@ pub async fn handle_tool_call(
         "react" => handle_react(args, api, state_dir).await,
         "download_attachment" => handle_download(args, api, inbox_dir).await,
         "edit_message" => handle_edit(args, api, state_dir).await,
+        "set_topic_title" => {
+            anyhow::bail!(
+                "set_topic_title is only available in router mode — \
+                 direct mode has no forum-topic concept"
+            )
+        }
         _ => anyhow::bail!("unknown tool: {name}"),
     }
 }

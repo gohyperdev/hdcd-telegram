@@ -188,6 +188,131 @@ Done. Your next DM reaches Claude.
 
 No ports opened. No webhooks. Everything runs locally over stdio + outbound HTTPS to `api.telegram.org`.
 
+## Router mode (multi-session)
+
+The default standalone mode supports one Claude Code session per bot token. If you run multiple sessions simultaneously (parallel agents, CI workers, different projects), each would need its own bot -- and only one can poll at a time (Telegram returns 409 Conflict otherwise).
+
+**Router mode** solves this with a two-binary architecture:
+
+```
+┌─────────────┐     ┌────────────────┐     ┌──────────────────┐     ┌────────────┐
+│  Telegram    │────▶│ hdcd-router  │────▶│  hdcd-telegram   │────▶│ Claude Code│
+│  (forum      │◀────│ (single poll)  │◀────│  (--router mode) │◀────│ (session)  │
+│   topics)    │     └────────────────┘     └──────────────────┘     └────────────┘
+└─────────────┘       one process            one per session          one per session
+```
+
+- **hdcd-router** holds the single Telegram polling connection, creates a forum topic per session, and routes messages via filesystem IPC (JSONL mailbox files)
+- **hdcd-telegram --router** runs in router mode -- no direct Telegram polling, reads from inbox, writes to outbox
+- Each session gets its own forum topic in a Telegram supergroup
+- Topics start with a placeholder title (project folder + short session ID, e.g. `hdcd-telegram #a1b2c3`) and Claude renames them via the `set_topic_title` MCP tool once the conversation topic becomes clear
+
+### Router setup
+
+#### 1. Create a Telegram supergroup with topics
+
+1. Create a new group in Telegram (any name, e.g. "Claude Sessions")
+2. Open group settings > **Group Type** > set to **Public** or **Private** (this converts it to a supergroup)
+3. Go to settings > **Topics** > toggle **ON** (this option only appears after the group is a supergroup)
+4. Add your bot to the group
+5. Promote the bot to admin with **Manage Topics** enabled (required to create, close, and reopen forum topics). Other admin permissions are optional.
+
+> **Tip:** If you don't see the Topics toggle, make sure you completed step 2 first — Topics are only available in supergroups, not regular groups.
+
+#### 2. Get your supergroup ID and user ID
+
+Send any message in the group, then query the bot API:
+
+```bash
+curl -s "https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates" | jq '.result[-1].message'
+```
+
+From the response:
+- **supergroup ID**: `.chat.id` — negative, starts with `-100` (e.g. `-1001234567890`)
+- **your user ID**: `.from.id` — positive number (e.g. `123456789`)
+
+#### 3. Configure the router
+
+```bash
+mkdir -p ~/.claude/channels/telegram-router
+cat > ~/.claude/channels/telegram-router/config.json << 'EOF'
+{
+  "bot_token": "YOUR_BOT_TOKEN",
+  "supergroup_id": "-100XXXXXXXXXX",
+  "allowed_users": ["YOUR_TELEGRAM_USER_ID"]
+}
+EOF
+```
+
+Optional config fields:
+
+| Field | Default | Description |
+|---|---|---|
+| `close_topic_on_disconnect` | `true` | Close forum topic when session disconnects |
+| `outbox_poll_interval_ms` | `200` | How often to check outbox files |
+| `health_check_interval_s` | `30` | How often to check if session PIDs are alive |
+| `auto_shutdown_delay_s` | `60` | Shut down router after this many seconds with no active sessions (0 = stay running) |
+
+#### 4. Launch Claude Code sessions
+
+The router starts automatically when needed. `hdcd-telegram --router` checks `router.lock` on startup -- if the router isn't running, it spawns `hdcd-router` as a background process (both binaries must be in the same directory). The router shuts down automatically after 60 seconds with no active sessions.
+
+To start the router manually instead: `./hdcd-router`
+
+Each session uses `hdcd-telegram` in router mode. Add to `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "telegram": {
+      "command": "/path/to/hdcd-telegram",
+      "args": ["--router"]
+    }
+  }
+}
+```
+
+Then launch as usual:
+
+```bash
+claude --dangerously-load-development-channels server:telegram
+```
+
+Each session automatically registers with the router, gets a forum topic, and starts receiving messages.
+
+#### Router commands
+
+Send these in the General topic of your supergroup:
+
+| Command | Description |
+|---|---|
+| `/status` | List active sessions with PIDs, topic IDs, and working directories |
+| `/kill <session-id>` | Close a session's forum topic |
+| `/help` | Show available commands |
+
+### How router mode works
+
+```
+~/.claude/channels/telegram-router/
+  config.json          ← router config
+  sessions.json        ← persistent session registry
+  router.lock          ← heartbeat file (PID + timestamp)
+  register/            ← session registration files
+    <session-id>.json
+  inbox/               ← Telegram → session (router writes, MCP reads)
+    <session-id>.jsonl
+  outbox/              ← session → Telegram (MCP writes, router reads)
+    <session-id>.jsonl
+```
+
+1. `hdcd-telegram --router` writes a registration file to `register/`
+2. `hdcd-router` detects it, creates a forum topic, updates `sessions.json`
+3. Telegram messages in the topic are written to `inbox/<session-id>.jsonl`
+4. MCP server reads inbox, converts to `notifications/claude/channel`
+5. Claude's replies (via `reply` tool) are written to `outbox/<session-id>.jsonl`
+6. Router reads outbox, sends to the correct forum topic
+7. On disconnect (stdin EOF or dead PID), topic is closed
+
 ## Troubleshooting
 
 ### Authentication: channels require claude.ai OAuth
@@ -288,6 +413,7 @@ If whisper or ffmpeg are not installed, voice messages are forwarded as `"(voice
 | `WHISPER_MODEL` | `small` | Whisper model size (`tiny`, `base`, `small`, `medium`, `large`) |
 | `WHISPER_LANGUAGE` | auto-detect | Language hint (`Polish`, `English`, etc.) |
 | `HDCD_ECHO_TRANSCRIPT` | `true` | Send transcript back for user confirmation before delivering to Claude |
+| `ROUTER_STATE_DIR` | `~/.claude/channels/telegram-router` | Router state directory (config.json, sessions, mailbox) |
 | `RUST_LOG` | `hdcd_telegram=info` | Log level filter ([`tracing-subscriber`](https://docs.rs/tracing-subscriber) format) |
 
 ## Running alongside the official Telegram plugin
@@ -318,11 +444,12 @@ If only `TELEGRAM_BOT_TOKEN` is set, hdcd-telegram uses it as before — fully b
 ## Features
 
 - **All 8 message types**: text, photo, document, voice, audio, video, video note, sticker
-- **4 MCP tools**: `reply` (with chunking, threading, file attachments, MarkdownV2), `react`, `edit_message`, `download_attachment`
+- **5 MCP tools**: `reply` (with chunking, threading, file attachments, MarkdownV2), `react`, `edit_message`, `download_attachment`, `set_topic_title` (router mode — lets Claude rename its forum topic when the conversation shifts)
 - **Access control**: pairing flow (6-hex code), allowlist, group policies with @mention gating
 - **Permission relay**: inline keyboard for remote tool-use approval/denial (`claude/channel/permission`)
 - **Voice transcription** (optional): automatic speech-to-text via [whisper](https://github.com/openai/whisper) with echo-back confirmation flow
 - **Bot commands**: `/start`, `/help`, `/status`
+- **Router mode**: multi-session support via `hdcd-router` + forum topics (one topic per session, `/status`, `/kill` commands)
 - **409 Conflict retry** with exponential backoff
 - **Clean shutdown** on stdin EOF (no zombie polling)
 
