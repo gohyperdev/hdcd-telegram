@@ -228,6 +228,11 @@ async fn handle_deliver(
             meta.insert("attachment_name".into(), json!(access::safe_name(name)));
         }
     }
+    // Expose reply-thread context: if the user replied to a specific message,
+    // include that message's ID so Claude can understand the conversation thread.
+    if let Some(ref reply) = msg.reply_to_message {
+        meta.insert("reply_to".into(), json!(reply.message_id.to_string()));
+    }
 
     let frame = json!({
         "jsonrpc": "2.0",
