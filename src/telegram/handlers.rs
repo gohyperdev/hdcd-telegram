@@ -230,6 +230,10 @@ async fn handle_deliver(
     }
     // Expose reply-thread context: if the user replied to a specific message,
     // include that message's ID so Claude can understand the conversation thread.
+    // SECURITY: Only expose message_id from reply_to_message — an integer.
+    // Do NOT add text, from, caption, or other fields: reply_to_message is a
+    // Box<Message> that may belong to a non-allowlisted user, and exposing its
+    // content or identity would leak data to the agent without consent.
     if let Some(ref reply) = msg.reply_to_message {
         meta.insert("reply_to".into(), json!(reply.message_id.to_string()));
     }
