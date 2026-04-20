@@ -65,8 +65,10 @@ impl TopicManager {
             .claude_session_id_of(session_id)
             .map(str::to_string);
 
-        if current_topic.is_some() && current_claude_id == reg.claude_session_id {
-            return Ok(current_topic.unwrap());
+        if let Some(topic) = current_topic {
+            if current_claude_id == reg.claude_session_id {
+                return Ok(topic);
+            }
         }
 
         let existing_for_claude = reg
@@ -132,11 +134,7 @@ impl TopicManager {
                 _ => {
                     let topic = self
                         .api
-                        .create_forum_topic(
-                            &self.supergroup_id,
-                            &reg.label,
-                            Some(TOPIC_ICON_COLOR),
-                        )
+                        .create_forum_topic(&self.supergroup_id, &reg.label, Some(TOPIC_ICON_COLOR))
                         .await?;
                     topic.message_thread_id
                 }

@@ -119,10 +119,9 @@ pub fn state_dir() -> Result<PathBuf> {
 pub fn load(state_dir: &Path) -> Result<RouterConfig> {
     let path = state_dir.join("config.json");
     crate::fs_perms::warn_if_world_readable(&path);
-    let raw = std::fs::read_to_string(&path)
-        .with_context(|| format!("read {}", path.display()))?;
-    let mut config: RouterConfig = serde_json::from_str(&raw)
-        .with_context(|| format!("parse {}", path.display()))?;
+    let raw = std::fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
+    let mut config: RouterConfig =
+        serde_json::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
 
     if config.bot_token.is_empty() {
         let fallback_dir = standalone_state_dir()?;
@@ -212,7 +211,9 @@ mod tests {
             "bot_token": "123:AAHtest",
             "supergroup_id": "not-a-number"
         }"#;
-        let err = serde_json::from_str::<RouterConfig>(json).unwrap_err().to_string();
+        let err = serde_json::from_str::<RouterConfig>(json)
+            .unwrap_err()
+            .to_string();
         assert!(err.contains("invalid chat id"), "got: {err}");
     }
 

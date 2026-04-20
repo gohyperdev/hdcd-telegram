@@ -497,7 +497,8 @@ mod tests {
 
         // Commit first message; now finish the partial line and peek again.
         commit_pos(&pos, peeked[0].0);
-        f.write_all(b",\"files\":[],\"format\":\"text\"}\n").unwrap();
+        f.write_all(b",\"files\":[],\"format\":\"text\"}\n")
+            .unwrap();
 
         let peeked2: Vec<(u64, OutboxMessage)> = peek_new_lines(&jsonl, &pos).unwrap();
         assert_eq!(peeked2.len(), 1);

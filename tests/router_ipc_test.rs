@@ -28,7 +28,10 @@ fn binary_path() -> PathBuf {
 }
 
 /// Read one JSON line from stdout, with a timeout.
-fn read_line_timeout(reader: &mut BufReader<std::process::ChildStdout>, timeout: Duration) -> Option<String> {
+fn read_line_timeout(
+    reader: &mut BufReader<std::process::ChildStdout>,
+    timeout: Duration,
+) -> Option<String> {
     // Use a polling approach since BufReader doesn't support timeouts directly.
     let start = std::time::Instant::now();
     let mut line = String::new();
@@ -113,12 +116,7 @@ fn router_mode_ipc_flow() {
     let reg_files: Vec<_> = std::fs::read_dir(&register_dir)
         .unwrap()
         .flatten()
-        .filter(|e| {
-            e.path()
-                .extension()
-                .and_then(|x| x.to_str())
-                == Some("json")
-        })
+        .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("json"))
         .collect();
     assert_eq!(
         reg_files.len(),
@@ -148,8 +146,8 @@ fn router_mode_ipc_flow() {
     writeln!(stdin, "{}", serde_json::to_string(&init_req).unwrap()).unwrap();
     stdin.flush().unwrap();
 
-    let resp_line = read_line_timeout(&mut reader, Duration::from_secs(3))
-        .expect("no response to initialize");
+    let resp_line =
+        read_line_timeout(&mut reader, Duration::from_secs(3)).expect("no response to initialize");
     let resp: serde_json::Value = serde_json::from_str(&resp_line).unwrap();
     assert_eq!(resp["id"], 1);
     assert!(resp["result"]["protocolVersion"].is_string());
@@ -166,8 +164,8 @@ fn router_mode_ipc_flow() {
     writeln!(stdin, "{}", serde_json::to_string(&list_req).unwrap()).unwrap();
     stdin.flush().unwrap();
 
-    let resp_line = read_line_timeout(&mut reader, Duration::from_secs(3))
-        .expect("no response to tools/list");
+    let resp_line =
+        read_line_timeout(&mut reader, Duration::from_secs(3)).expect("no response to tools/list");
     let resp: serde_json::Value = serde_json::from_str(&resp_line).unwrap();
     assert_eq!(resp["id"], 2);
     let tool_names: Vec<&str> = resp["result"]["tools"]
@@ -178,13 +176,14 @@ fn router_mode_ipc_flow() {
         .collect();
     assert!(tool_names.contains(&"reply"), "missing reply tool");
     assert!(tool_names.contains(&"react"), "missing react tool");
-    assert!(tool_names.contains(&"edit_message"), "missing edit_message tool");
+    assert!(
+        tool_names.contains(&"edit_message"),
+        "missing edit_message tool"
+    );
     eprintln!("tools/list OK: {tool_names:?}");
 
     // --- Step 4: Write to inbox → expect MCP notification on stdout ---
-    let inbox_path = state_path
-        .join("inbox")
-        .join(format!("{session_id}.jsonl"));
+    let inbox_path = state_path.join("inbox").join(format!("{session_id}.jsonl"));
     let inbox_msg = serde_json::json!({
         "text": "hello from test",
         "user": "tester",
@@ -227,9 +226,7 @@ fn router_mode_ipc_flow() {
         .expect("no response to reply tool call");
     let resp: serde_json::Value = serde_json::from_str(&resp_line).unwrap();
     assert_eq!(resp["id"], 3);
-    let reply_text = resp["result"]["content"][0]["text"]
-        .as_str()
-        .unwrap();
+    let reply_text = resp["result"]["content"][0]["text"].as_str().unwrap();
     assert!(
         reply_text.contains("via router"),
         "expected 'via router' in response, got: {reply_text}"
@@ -242,8 +239,7 @@ fn router_mode_ipc_flow() {
         .join(format!("{session_id}.jsonl"));
     assert!(outbox_path.exists(), "outbox file not created");
     let outbox_content = std::fs::read_to_string(&outbox_path).unwrap();
-    let outbox_msg: serde_json::Value =
-        serde_json::from_str(outbox_content.trim()).unwrap();
+    let outbox_msg: serde_json::Value = serde_json::from_str(outbox_content.trim()).unwrap();
     assert_eq!(outbox_msg["text"], "hello back from claude");
     eprintln!("outbox file OK: {}", outbox_msg["text"]);
 
@@ -264,7 +260,10 @@ fn router_mode_ipc_flow() {
             }
         }
     };
-    assert!(status.success(), "process exited with non-zero status: {status}");
+    assert!(
+        status.success(),
+        "process exited with non-zero status: {status}"
+    );
 
     // Check disconnect marker.
     let reg_raw2 = std::fs::read_to_string(&reg_path).unwrap();

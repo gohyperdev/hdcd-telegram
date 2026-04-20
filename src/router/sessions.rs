@@ -249,10 +249,10 @@ impl SessionRegistry {
         }
         #[cfg(windows)]
         {
+            use windows_sys::Win32::Foundation::CloseHandle;
             use windows_sys::Win32::System::Threading::{
                 GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
             };
-            use windows_sys::Win32::Foundation::CloseHandle;
             const STILL_ACTIVE: u32 = 259;
             let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
             if handle.is_null() {
@@ -319,10 +319,7 @@ mod tests {
         reg.bind("s1", 10, &registration);
 
         reg.close("s1");
-        assert_eq!(
-            reg.sessions["s1"].state,
-            SessionState::Closed
-        );
+        assert_eq!(reg.sessions["s1"].state, SessionState::Closed);
         // Closed sessions not found by topic lookup.
         assert_eq!(reg.session_by_topic(10), None);
     }

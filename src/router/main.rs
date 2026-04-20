@@ -63,12 +63,8 @@ async fn main() -> Result<()> {
         }
     };
 
-    let cfg = config::load(&sd).with_context(|| {
-        format!(
-            "failed to load config from {}/config.json",
-            sd.display()
-        )
-    })?;
+    let cfg = config::load(&sd)
+        .with_context(|| format!("failed to load config from {}/config.json", sd.display()))?;
 
     info!(
         supergroup = %cfg.supergroup_id,
@@ -105,7 +101,10 @@ async fn main() -> Result<()> {
     if stale.is_empty() {
         info!("no stale sessions to reconcile");
     } else {
-        info!(count = stale.len(), "reconciled stale sessions from previous run");
+        info!(
+            count = stale.len(),
+            "reconciled stale sessions from previous run"
+        );
     }
 
     // Cancellation token for clean shutdown.
@@ -137,8 +136,7 @@ async fn main() -> Result<()> {
     let reg_state = Arc::clone(&state);
     let reg_cancel = cancel.clone();
     tokio::spawn(async move {
-        let mut interval =
-            tokio::time::interval(std::time::Duration::from_secs(2));
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(2));
         loop {
             tokio::select! {
                 _ = interval.tick() => {}
@@ -171,9 +169,8 @@ async fn main() -> Result<()> {
     let health_state = Arc::clone(&state);
     let health_cancel = cancel.clone();
     tokio::spawn(async move {
-        let mut interval = tokio::time::interval(std::time::Duration::from_secs(
-            cfg.health_check_interval_s,
-        ));
+        let mut interval =
+            tokio::time::interval(std::time::Duration::from_secs(cfg.health_check_interval_s));
         loop {
             tokio::select! {
                 _ = interval.tick() => {}
@@ -190,8 +187,7 @@ async fn main() -> Result<()> {
     if auto_shutdown_delay > 0 {
         tokio::spawn(async move {
             let mut idle_since: Option<tokio::time::Instant> = None;
-            let mut interval =
-                tokio::time::interval(std::time::Duration::from_secs(10));
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(10));
             // Skip the first immediate tick.
             interval.tick().await;
             loop {
@@ -225,8 +221,7 @@ async fn main() -> Result<()> {
     let heartbeat_cancel = cancel.clone();
     write_heartbeat(&heartbeat_sd); // initial write
     tokio::spawn(async move {
-        let mut interval =
-            tokio::time::interval(std::time::Duration::from_secs(30));
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(30));
         loop {
             tokio::select! {
                 _ = interval.tick() => {}
@@ -301,10 +296,7 @@ async fn main() -> Result<()> {
 
 /// Handle an incoming Telegram update: route supergroup topic messages
 /// to the correct session's inbox file.
-async fn handle_update(
-    update: &types::Update,
-    state: &Arc<Mutex<RouterState>>,
-) -> Result<()> {
+async fn handle_update(update: &types::Update, state: &Arc<Mutex<RouterState>>) -> Result<()> {
     // ALLOWLIST INVARIANT: any new update variant handled below MUST call
     // is_allowed() before dispatching to session-affecting logic. The
     // early-return here only covers variants we ignore entirely.
@@ -393,12 +385,8 @@ async fn handle_update(
     };
 
     let from = msg.from.as_ref();
-    let user = from
-        .and_then(|u| u.username.as_deref())
-        .unwrap_or("?");
-    let user_id = from
-        .map(|u| u.id.to_string())
-        .unwrap_or_default();
+    let user = from.and_then(|u| u.username.as_deref()).unwrap_or("?");
+    let user_id = from.map(|u| u.id.to_string()).unwrap_or_default();
     let text = msg
         .text
         .as_deref()
@@ -416,7 +404,7 @@ async fn handle_update(
         chat_id: chat_id.to_string(),
         message_id: msg.message_id,
         ts,
-        image_path: None,    // TODO Phase 3+: download photos
+        image_path: None, // TODO Phase 3+: download photos
         attachment_file_id: None,
         attachment_kind: None,
         attachment_name: None,
@@ -455,14 +443,8 @@ fn handle_general_command(
             }
             let mut lines = vec!["Active sessions:".to_string()];
             for (id, entry) in active {
-                let pid = entry
-                    .pid
-                    .map(|p| format!(" (PID {p})"))
-                    .unwrap_or_default();
-                let cwd = entry
-                    .cwd
-                    .as_deref()
-                    .unwrap_or("?");
+                let pid = entry.pid.map(|p| format!(" (PID {p})")).unwrap_or_default();
+                let cwd = entry.cwd.as_deref().unwrap_or("?");
                 lines.push(format!(
                     "• {}{pid}\n  topic {} · {}",
                     entry.label, entry.topic_id, cwd
@@ -483,10 +465,7 @@ fn handle_general_command(
 }
 
 /// Handle `/kill <session-id>` — needs mutable state access.
-async fn handle_kill_command(
-    target: &str,
-    state: &Arc<Mutex<RouterState>>,
-) -> String {
+async fn handle_kill_command(target: &str, state: &Arc<Mutex<RouterState>>) -> String {
     let mut s = state.lock().await;
 
     let has_topic = s.registry.topic_by_session(target).is_some();
@@ -509,10 +488,7 @@ async fn handle_kill_command(
 // ---------------------------------------------------------------------------
 
 /// Poll all outbox files and send pending messages to their topics.
-async fn poll_outbox(
-    state: &Arc<Mutex<RouterState>>,
-    api: &Arc<api::BotApi>,
-) {
+async fn poll_outbox(state: &Arc<Mutex<RouterState>>, api: &Arc<api::BotApi>) {
     let s = state.lock().await;
 
     // Collect active sessions to iterate.
@@ -547,7 +523,11 @@ async fn poll_outbox(
             // to the registry + TopicManager, not the raw Telegram API.
             if let Some(ref new_title) = msg.rename_to {
                 let mut s = state.lock().await;
-                let RouterState { topic_mgr, registry, .. } = &mut *s;
+                let RouterState {
+                    topic_mgr,
+                    registry,
+                    ..
+                } = &mut *s;
                 topic_mgr
                     .rename_topic(&session_id, new_title, registry)
                     .await;
@@ -586,9 +566,7 @@ async fn deliver_outbox_message(
     msg: &mailbox::OutboxMessage,
 ) -> Result<()> {
     // Handle reactions.
-    if let (Some(react_msg_id), Some(ref emoji)) =
-        (msg.react_message_id, &msg.react_emoji)
-    {
+    if let (Some(react_msg_id), Some(ref emoji)) = (msg.react_message_id, &msg.react_emoji) {
         api.set_message_reaction(supergroup_id, react_msg_id, emoji)
             .await?;
         return Ok(());
@@ -628,9 +606,7 @@ async fn deliver_outbox_message(
 // ---------------------------------------------------------------------------
 
 /// Scan the register/ directory for new or updated registration files.
-async fn process_registrations(
-    state: &Arc<Mutex<RouterState>>,
-) -> Result<()> {
+async fn process_registrations(state: &Arc<Mutex<RouterState>>) -> Result<()> {
     let register_dir = {
         let s = state.lock().await;
         s.register_dir.clone()
@@ -669,7 +645,11 @@ async fn process_registrations(
             let has_topic = s.registry.topic_by_session(&reg.session_id).is_some();
             if has_topic {
                 info!(session_id = %reg.session_id, "session disconnected");
-                let RouterState { topic_mgr, registry, .. } = &mut *s;
+                let RouterState {
+                    topic_mgr,
+                    registry,
+                    ..
+                } = &mut *s;
                 topic_mgr.close_topic(&reg.session_id, registry).await;
             }
             drop(s);
@@ -729,7 +709,11 @@ async fn process_registrations(
         );
 
         let mut s = state.lock().await;
-        let RouterState { topic_mgr, registry, .. } = &mut *s;
+        let RouterState {
+            topic_mgr,
+            registry,
+            ..
+        } = &mut *s;
         if let Err(e) = topic_mgr.reconcile_session(&reg, registry).await {
             error!(
                 session_id = %reg.session_id,
@@ -759,7 +743,11 @@ async fn close_dead_sessions(state: &Arc<Mutex<RouterState>>) -> Vec<String> {
     for session_id in &dead {
         info!(session_id, "session PID dead, closing topic");
         let mut s = state.lock().await;
-        let RouterState { topic_mgr, registry, .. } = &mut *s;
+        let RouterState {
+            topic_mgr,
+            registry,
+            ..
+        } = &mut *s;
         topic_mgr.close_topic(session_id, registry).await;
     }
     dead
@@ -833,7 +821,6 @@ fn acquire_lock_guard(state_dir: &Path) -> Result<std::fs::File> {
     Ok(file)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -863,7 +850,10 @@ mod tests {
     #[test]
     fn status_with_sessions() {
         let active = vec![
-            ("sess-1".to_string(), make_entry("VS Code: project", Some(1234), Some("/home/user/project"))),
+            (
+                "sess-1".to_string(),
+                make_entry("VS Code: project", Some(1234), Some("/home/user/project")),
+            ),
             ("sess-2".to_string(), make_entry("CLI: sweep", None, None)),
         ];
         let reply = handle_general_command("/status", &active).unwrap();
