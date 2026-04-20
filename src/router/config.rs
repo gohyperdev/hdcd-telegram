@@ -118,6 +118,7 @@ pub fn state_dir() -> Result<PathBuf> {
 /// Load router config from `config.json` in the given state directory.
 pub fn load(state_dir: &Path) -> Result<RouterConfig> {
     let path = state_dir.join("config.json");
+    crate::fs_perms::warn_if_world_readable(&path);
     let raw = std::fs::read_to_string(&path)
         .with_context(|| format!("read {}", path.display()))?;
     let mut config: RouterConfig = serde_json::from_str(&raw)

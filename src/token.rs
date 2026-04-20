@@ -27,7 +27,7 @@ pub fn try_load_token(state_dir: &Path) -> Result<Option<String>> {
 
     let env_file = state_dir.join(".env");
     if env_file.exists() {
-        warn_if_world_readable(&env_file);
+        crate::fs_perms::warn_if_world_readable(&env_file);
 
         let content = std::fs::read_to_string(&env_file)
             .with_context(|| format!("read {}", env_file.display()))?;
@@ -68,28 +68,6 @@ pub fn load_token(state_dir: &Path) -> Result<String> {
              format: HDCD_TELEGRAM_BOT_TOKEN=123456789:AAH...",
             state_dir.join(".env").display()
         ),
-    }
-}
-
-fn warn_if_world_readable(path: &Path) {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        if let Ok(meta) = std::fs::metadata(path) {
-            let mode = meta.permissions().mode();
-            if mode & 0o044 != 0 {
-                tracing::warn!(
-                    path = %path.display(),
-                    "WARNING: {} is world-readable, consider: chmod 600 {}",
-                    path.display(),
-                    path.display()
-                );
-            }
-        }
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = path;
     }
 }
 

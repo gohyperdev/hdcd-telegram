@@ -41,6 +41,30 @@ pub fn secure_file(_path: &Path) -> io::Result<()> {
     Ok(())
 }
 
+/// Emit a `warn!` if `path` is group- or world-readable on Unix.
+/// Suggests `chmod 600 <path>` in the message. No-op on Windows.
+pub fn warn_if_world_readable(path: &Path) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(meta) = std::fs::metadata(path) {
+            let mode = meta.permissions().mode();
+            if mode & 0o044 != 0 {
+                tracing::warn!(
+                    path = %path.display(),
+                    "WARNING: {} is world/group-readable, consider: chmod 600 {}",
+                    path.display(),
+                    path.display()
+                );
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+    }
+}
+
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
