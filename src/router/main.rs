@@ -246,7 +246,7 @@ async fn main() -> Result<()> {
         exe_build_time(),
     );
     let _ = bot_api
-        .send_message(&cfg.supergroup_id, &startup_msg, None, None, None, None)
+        .send_message(&cfg.chat_id_str(), &startup_msg, None, None, None, None)
         .await;
 
     // Main loop: process incoming Telegram updates.
@@ -277,7 +277,7 @@ async fn main() -> Result<()> {
     );
     let _ = tokio::time::timeout(
         std::time::Duration::from_secs(SHUTDOWN_SEND_TIMEOUT_SECS),
-        bot_api.send_message(&cfg.supergroup_id, &shutdown_msg, None, None, None, None),
+        bot_api.send_message(&cfg.chat_id_str(), &shutdown_msg, None, None, None, None),
     )
     .await;
 
@@ -311,7 +311,7 @@ async fn handle_update(
     };
 
     let mut s = state.lock().await;
-    let chat_id = msg.chat.id.to_string();
+    let chat_id = msg.chat.id;
 
     // Only handle messages from the configured supergroup.
     if chat_id != s.config.supergroup_id {
@@ -339,7 +339,7 @@ async fn handle_update(
         None => {
             // Message in General topic — handle as router command.
             let api = Arc::clone(s.topic_mgr.api());
-            let supergroup_id = s.config.supergroup_id.clone();
+            let supergroup_id = s.config.chat_id_str();
             let text = msg.text.as_deref().unwrap_or("").to_string();
 
             // Collect active sessions as owned data before releasing lock.
@@ -399,7 +399,7 @@ async fn handle_update(
         text,
         user: user.to_string(),
         user_id,
-        chat_id: chat_id.clone(),
+        chat_id: chat_id.to_string(),
         message_id: msg.message_id,
         ts,
         image_path: None,    // TODO Phase 3+: download photos
@@ -510,7 +510,7 @@ async fn poll_outbox(
         .collect();
 
     let outbox_dir = s.outbox_dir.clone();
-    let supergroup_id = s.config.supergroup_id.clone();
+    let supergroup_id = s.config.chat_id_str();
     drop(s); // release lock before I/O
 
     for (session_id, topic_id) in active {

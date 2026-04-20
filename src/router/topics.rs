@@ -22,6 +22,8 @@ const TOPIC_ICON_COLOR: i64 = 16766590;
 /// Manages forum topics for the router.
 pub struct TopicManager {
     api: Arc<BotApi>,
+    /// String form of the supergroup chat id, cached at construction
+    /// because every Bot API call here wants `chat_id: &str`.
     supergroup_id: String,
     close_on_disconnect: bool,
 }
@@ -30,7 +32,7 @@ impl TopicManager {
     pub fn new(api: Arc<BotApi>, config: &RouterConfig) -> Self {
         Self {
             api,
-            supergroup_id: config.supergroup_id.clone(),
+            supergroup_id: config.chat_id_str(),
             close_on_disconnect: config.close_topic_on_disconnect,
         }
     }

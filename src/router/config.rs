@@ -2,17 +2,23 @@
 
 //! Router configuration — reads `config.json` from the router state directory.
 
+use std::fmt;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use serde::Deserialize;
+use serde::de::{self, Visitor};
+use serde::{Deserialize, Deserializer};
 
 /// Router configuration loaded from
 /// `~/.claude/channels/telegram-router/config.json`.
 #[derive(Debug, Clone, Deserialize)]
 pub struct RouterConfig {
     pub bot_token: String,
-    pub supergroup_id: String,
+    /// Supergroup chat ID. Accepts both JSON integer (`-1001234567890`)
+    /// and JSON string (`"-1001234567890"`) on deserialization so users
+    /// can copy the id however their tools emit it.
+    #[serde(deserialize_with = "de_chat_id")]
+    pub supergroup_id: i64,
     #[serde(default)]
     pub allowed_users: Vec<String>,
     #[serde(default = "default_session_label_format")]
@@ -27,6 +33,14 @@ pub struct RouterConfig {
     pub health_check_interval_s: u64,
     #[serde(default = "default_auto_shutdown_s")]
     pub auto_shutdown_delay_s: u64,
+}
+
+impl RouterConfig {
+    /// String form of `supergroup_id` for Telegram API calls that take
+    /// `chat_id: &str`.
+    pub fn chat_id_str(&self) -> String {
+        self.supergroup_id.to_string()
+    }
 }
 
 fn default_session_label_format() -> String {
@@ -46,6 +60,34 @@ fn default_health_check_s() -> u64 {
 }
 fn default_auto_shutdown_s() -> u64 {
     60
+}
+
+/// Accept either a JSON integer or a JSON string for the chat id.
+/// Strings are trimmed before parsing to tolerate leading/trailing
+/// whitespace from copy-paste.
+fn de_chat_id<'de, D: Deserializer<'de>>(d: D) -> std::result::Result<i64, D::Error> {
+    struct V;
+    impl<'de> Visitor<'de> for V {
+        type Value = i64;
+        fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            f.write_str("a Telegram chat id (integer or string, e.g. -1001234567890)")
+        }
+        fn visit_i64<E: de::Error>(self, v: i64) -> std::result::Result<i64, E> {
+            Ok(v)
+        }
+        fn visit_u64<E: de::Error>(self, v: u64) -> std::result::Result<i64, E> {
+            i64::try_from(v).map_err(|_| E::custom("chat id overflows i64"))
+        }
+        fn visit_str<E: de::Error>(self, v: &str) -> std::result::Result<i64, E> {
+            v.trim().parse::<i64>().map_err(|e| {
+                E::custom(format!(
+                    "invalid chat id {:?}: {} (expected integer like -1001234567890)",
+                    v, e
+                ))
+            })
+        }
+    }
+    d.deserialize_any(V)
 }
 
 /// Resolve the router state directory: `~/.claude/channels/telegram-router/`.
@@ -75,8 +117,11 @@ pub fn load(state_dir: &Path) -> Result<RouterConfig> {
     if config.bot_token.is_empty() {
         anyhow::bail!("bot_token is empty in {}", path.display());
     }
-    if config.supergroup_id.is_empty() {
-        anyhow::bail!("supergroup_id is empty in {}", path.display());
+    if config.supergroup_id == 0 {
+        anyhow::bail!(
+            "supergroup_id is 0 in {} (expected a Telegram chat id like -1001234567890)",
+            path.display()
+        );
     }
 
     Ok(config)
@@ -94,13 +139,44 @@ mod tests {
         }"#;
         let config: RouterConfig = serde_json::from_str(json).unwrap();
         assert_eq!(config.bot_token, "123:AAHtest");
-        assert_eq!(config.supergroup_id, "-1001234567890");
+        assert_eq!(config.supergroup_id, -1001234567890);
+        assert_eq!(config.chat_id_str(), "-1001234567890");
         assert!(config.allowed_users.is_empty());
         assert!(config.close_topic_on_disconnect);
         assert_eq!(config.outbox_poll_interval_ms, 200);
         assert_eq!(config.inbox_poll_interval_ms, 500);
         assert_eq!(config.health_check_interval_s, 30);
         assert_eq!(config.auto_shutdown_delay_s, 60);
+    }
+
+    #[test]
+    fn supergroup_id_accepts_integer() {
+        let json = r#"{
+            "bot_token": "123:AAHtest",
+            "supergroup_id": -1001234567890
+        }"#;
+        let config: RouterConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.supergroup_id, -1001234567890);
+    }
+
+    #[test]
+    fn supergroup_id_trims_whitespace() {
+        let json = r#"{
+            "bot_token": "123:AAHtest",
+            "supergroup_id": "  -1001234567890  "
+        }"#;
+        let config: RouterConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.supergroup_id, -1001234567890);
+    }
+
+    #[test]
+    fn supergroup_id_invalid_string_rejected() {
+        let json = r#"{
+            "bot_token": "123:AAHtest",
+            "supergroup_id": "not-a-number"
+        }"#;
+        let err = serde_json::from_str::<RouterConfig>(json).unwrap_err().to_string();
+        assert!(err.contains("invalid chat id"), "got: {err}");
     }
 
     #[test]
@@ -129,5 +205,14 @@ mod tests {
         let json = r#"{"bot_token": "", "supergroup_id": "-100"}"#;
         std::fs::write(dir.path().join("config.json"), json).unwrap();
         assert!(load(dir.path()).is_err());
+    }
+
+    #[test]
+    fn zero_supergroup_rejected_by_load() {
+        let dir = tempfile::tempdir().unwrap();
+        let json = r#"{"bot_token": "x", "supergroup_id": 0}"#;
+        std::fs::write(dir.path().join("config.json"), json).unwrap();
+        let err = load(dir.path()).unwrap_err().to_string();
+        assert!(err.contains("supergroup_id is 0"), "got: {err}");
     }
 }
