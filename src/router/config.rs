@@ -111,6 +111,7 @@ pub fn state_dir() -> Result<PathBuf> {
     };
     std::fs::create_dir_all(&dir)
         .with_context(|| format!("create router state dir {}", dir.display()))?;
+    let _ = crate::fs_perms::secure_dir(&dir);
     Ok(dir)
 }
 

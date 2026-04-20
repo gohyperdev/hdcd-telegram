@@ -86,6 +86,9 @@ pub fn ensure_dirs(state_dir: &Path) -> Result<(PathBuf, PathBuf, PathBuf)> {
     std::fs::create_dir_all(&inbox).context("create inbox dir")?;
     std::fs::create_dir_all(&outbox).context("create outbox dir")?;
     std::fs::create_dir_all(&register).context("create register dir")?;
+    let _ = crate::fs_perms::secure_dir(&inbox);
+    let _ = crate::fs_perms::secure_dir(&outbox);
+    let _ = crate::fs_perms::secure_dir(&register);
     Ok((inbox, outbox, register))
 }
 
@@ -109,6 +112,9 @@ pub fn append_line(path: &Path, value: &impl Serialize) -> Result<()> {
 
     file.write_all(&line)
         .with_context(|| format!("write to {}", path.display()))?;
+
+    // Tighten perms on first create. Idempotent — already-0600 is a no-op.
+    let _ = crate::fs_perms::secure_file(path);
 
     Ok(())
 }
@@ -221,7 +227,9 @@ fn read_pos(pos_path: &Path) -> u64 {
 }
 
 fn write_pos(pos_path: &Path, pos: u64) {
-    let _ = std::fs::write(pos_path, pos.to_string());
+    if std::fs::write(pos_path, pos.to_string()).is_ok() {
+        let _ = crate::fs_perms::secure_file(pos_path);
+    }
 }
 
 // ---------------------------------------------------------------------------

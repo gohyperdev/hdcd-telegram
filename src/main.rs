@@ -457,6 +457,7 @@ async fn run_router_mode() -> Result<()> {
     let reg_json = serde_json::to_string_pretty(&reg).context("serialize registration")?;
     std::fs::write(&reg_path, format!("{reg_json}\n"))
         .with_context(|| format!("write registration {}", reg_path.display()))?;
+    let _ = hdcd_telegram::fs_perms::secure_file(&reg_path);
     info!(path = %reg_path.display(), "registration file written");
 
     let inbox_path = inbox_dir.join(format!("{session_id}.jsonl"));

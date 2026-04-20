@@ -796,7 +796,9 @@ fn write_heartbeat(state_dir: &Path) {
     let pid = std::process::id();
     let ts = chrono::Utc::now().to_rfc3339();
     let content = format!("{{\"pid\":{pid},\"heartbeat\":\"{ts}\"}}\n");
-    let _ = std::fs::write(&lock_path, content);
+    if std::fs::write(&lock_path, content).is_ok() {
+        let _ = hdcd_telegram::fs_perms::secure_file(&lock_path);
+    }
 }
 
 /// Try to acquire the OS-level exclusive lock on `router.guard`. The returned
@@ -815,6 +817,7 @@ fn acquire_lock_guard(state_dir: &Path) -> Result<std::fs::File> {
         .truncate(false)
         .open(&guard_path)
         .with_context(|| format!("open lock guard {}", guard_path.display()))?;
+    let _ = hdcd_telegram::fs_perms::secure_file(&guard_path);
 
     let locked = file
         .try_lock_exclusive()

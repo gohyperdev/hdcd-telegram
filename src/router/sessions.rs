@@ -88,7 +88,9 @@ impl SessionRegistry {
         match serde_json::to_string_pretty(&self.sessions) {
             Ok(json) => {
                 if std::fs::write(&tmp, format!("{json}\n")).is_ok() {
+                    let _ = crate::fs_perms::secure_file(std::path::Path::new(&tmp));
                     let _ = std::fs::rename(&tmp, &self.path);
+                    let _ = crate::fs_perms::secure_file(&self.path);
                 }
             }
             Err(e) => warn!(error = %e, "failed to serialize sessions.json"),
