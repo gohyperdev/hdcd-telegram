@@ -93,29 +93,53 @@ fn warn_if_world_readable(path: &Path) {
     }
 }
 
+/// Serializes env-var access across token-discovery tests across the
+/// whole crate. Env vars are process-global; without a single shared
+/// mutex, parallel tests in different modules race.
+#[cfg(test)]
+pub(crate) static TEST_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Run `f` with `HDCD_TELEGRAM_BOT_TOKEN` / `TELEGRAM_BOT_TOKEN` /
+/// `HOME` / `USERPROFILE` cleared and `HOME`/`USERPROFILE` pointed at
+/// a fresh empty dir. Restores previous values on exit. Used by every
+/// test that exercises token discovery (here and in `router::config`).
+#[cfg(test)]
+pub(crate) fn with_isolated_token_env<F: FnOnce()>(f: F) {
+    let _g = TEST_ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    let prev_hdcd = std::env::var("HDCD_TELEGRAM_BOT_TOKEN").ok();
+    let prev_tg = std::env::var("TELEGRAM_BOT_TOKEN").ok();
+    let prev_state_dir = std::env::var("TELEGRAM_STATE_DIR").ok();
+    std::env::remove_var("HDCD_TELEGRAM_BOT_TOKEN");
+    std::env::remove_var("TELEGRAM_BOT_TOKEN");
+    // Redirect the standalone state dir — which holds `.env` — to an
+    // empty tempdir so `token::try_load_token` can't find a real token
+    // on the developer's machine.
+    let fake_state = tempfile::tempdir().expect("tempdir for fake TELEGRAM_STATE_DIR");
+    std::env::set_var("TELEGRAM_STATE_DIR", fake_state.path());
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f));
+    match prev_hdcd {
+        Some(v) => std::env::set_var("HDCD_TELEGRAM_BOT_TOKEN", v),
+        None => std::env::remove_var("HDCD_TELEGRAM_BOT_TOKEN"),
+    }
+    match prev_tg {
+        Some(v) => std::env::set_var("TELEGRAM_BOT_TOKEN", v),
+        None => std::env::remove_var("TELEGRAM_BOT_TOKEN"),
+    }
+    match prev_state_dir {
+        Some(v) => std::env::set_var("TELEGRAM_STATE_DIR", v),
+        None => std::env::remove_var("TELEGRAM_STATE_DIR"),
+    }
+    if let Err(p) = result {
+        std::panic::resume_unwind(p);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /// Guard that serializes env-var access across tests in this module.
-    /// Env vars are process-global; without this, parallel tests race.
-    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
     fn with_clean_env<F: FnOnce()>(f: F) {
-        let _g = ENV_LOCK.lock().unwrap_or_else(|p| p.into_inner());
-        let prev_hdcd = std::env::var("HDCD_TELEGRAM_BOT_TOKEN").ok();
-        let prev_tg = std::env::var("TELEGRAM_BOT_TOKEN").ok();
-        std::env::remove_var("HDCD_TELEGRAM_BOT_TOKEN");
-        std::env::remove_var("TELEGRAM_BOT_TOKEN");
-        f();
-        match prev_hdcd {
-            Some(v) => std::env::set_var("HDCD_TELEGRAM_BOT_TOKEN", v),
-            None => std::env::remove_var("HDCD_TELEGRAM_BOT_TOKEN"),
-        }
-        match prev_tg {
-            Some(v) => std::env::set_var("TELEGRAM_BOT_TOKEN", v),
-            None => std::env::remove_var("TELEGRAM_BOT_TOKEN"),
-        }
+        with_isolated_token_env(f);
     }
 
     #[test]

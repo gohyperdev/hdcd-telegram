@@ -9,10 +9,18 @@ use anyhow::{Context, Result};
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer};
 
+use crate::token;
+
 /// Router configuration loaded from
 /// `~/.claude/channels/telegram-router/config.json`.
 #[derive(Debug, Clone, Deserialize)]
 pub struct RouterConfig {
+    /// Bot token. Optional in `config.json` — if missing or empty the
+    /// loader falls back to `HDCD_TELEGRAM_BOT_TOKEN` /
+    /// `TELEGRAM_BOT_TOKEN` env vars, then to the standalone channel's
+    /// `~/.claude/channels/telegram/.env` file. Always populated after
+    /// `load()` returns.
+    #[serde(default)]
     pub bot_token: String,
     /// Supergroup chat ID. Accepts both JSON integer (`-1001234567890`)
     /// and JSON string (`"-1001234567890"`) on deserialization so users
@@ -111,11 +119,23 @@ pub fn load(state_dir: &Path) -> Result<RouterConfig> {
     let path = state_dir.join("config.json");
     let raw = std::fs::read_to_string(&path)
         .with_context(|| format!("read {}", path.display()))?;
-    let config: RouterConfig = serde_json::from_str(&raw)
+    let mut config: RouterConfig = serde_json::from_str(&raw)
         .with_context(|| format!("parse {}", path.display()))?;
 
     if config.bot_token.is_empty() {
-        anyhow::bail!("bot_token is empty in {}", path.display());
+        let fallback_dir = standalone_state_dir()?;
+        match token::try_load_token(&fallback_dir)? {
+            Some(t) => config.bot_token = t,
+            None => anyhow::bail!(
+                "bot_token required — set one of:\n  \
+                 - `bot_token` field in {}\n  \
+                 - `HDCD_TELEGRAM_BOT_TOKEN` env var (preferred)\n  \
+                 - `TELEGRAM_BOT_TOKEN` env var (legacy)\n  \
+                 - `HDCD_TELEGRAM_BOT_TOKEN=...` line in {}",
+                path.display(),
+                fallback_dir.join(".env").display()
+            ),
+        }
     }
     if config.supergroup_id == 0 {
         anyhow::bail!(
@@ -125,6 +145,21 @@ pub fn load(state_dir: &Path) -> Result<RouterConfig> {
     }
 
     Ok(config)
+}
+
+/// Standalone channel's state dir (`~/.claude/channels/telegram/`), used
+/// for the `.env` fallback when `config.json` omits `bot_token`.
+/// Honors `TELEGRAM_STATE_DIR` the same way the standalone binary does,
+/// so a user who overrides one also overrides the other.
+fn standalone_state_dir() -> Result<PathBuf> {
+    if let Ok(d) = std::env::var("TELEGRAM_STATE_DIR") {
+        return Ok(PathBuf::from(d));
+    }
+    Ok(dirs::home_dir()
+        .context("home dir unavailable")?
+        .join(".claude")
+        .join("channels")
+        .join("telegram"))
 }
 
 #[cfg(test)]
@@ -199,12 +234,29 @@ mod tests {
         assert_eq!(config.auto_shutdown_delay_s, 0);
     }
 
+    use crate::token::with_isolated_token_env;
+
     #[test]
-    fn empty_token_rejected() {
-        let dir = tempfile::tempdir().unwrap();
-        let json = r#"{"bot_token": "", "supergroup_id": "-100"}"#;
-        std::fs::write(dir.path().join("config.json"), json).unwrap();
-        assert!(load(dir.path()).is_err());
+    fn empty_token_with_no_fallback_rejected() {
+        with_isolated_token_env(|| {
+            let dir = tempfile::tempdir().unwrap();
+            let json = r#"{"bot_token": "", "supergroup_id": "-1001234567890"}"#;
+            std::fs::write(dir.path().join("config.json"), json).unwrap();
+            let err = load(dir.path()).unwrap_err().to_string();
+            assert!(err.contains("bot_token required"), "got: {err}");
+        });
+    }
+
+    #[test]
+    fn missing_bot_token_field_uses_env_fallback() {
+        with_isolated_token_env(|| {
+            std::env::set_var("HDCD_TELEGRAM_BOT_TOKEN", "env-fallback-token");
+            let dir = tempfile::tempdir().unwrap();
+            let json = r#"{"supergroup_id": "-1001234567890"}"#;
+            std::fs::write(dir.path().join("config.json"), json).unwrap();
+            let config = load(dir.path()).unwrap();
+            assert_eq!(config.bot_token, "env-fallback-token");
+        });
     }
 
     #[test]
