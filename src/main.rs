@@ -864,11 +864,25 @@ async fn router_tool_call(
 }
 
 /// Check if the router is running by reading `router.lock`. If not,
-/// spawn `hdcd-router` as a detached background process.
+/// spawn `hdcd-router` as a detached background process. Fails loudly
+/// when prerequisites are missing so the MCP server never silently
+/// sits in router mode with no peer to talk to.
 fn ensure_router_running(state_dir: &std::path::Path) -> Result<()> {
-    // Skip auto-launch if there's no config (e.g. test environment).
-    if !state_dir.join("config.json").exists() {
-        debug!("no config.json in state dir, skipping router auto-launch");
+    let config_path = state_dir.join("config.json");
+    if !config_path.exists() {
+        anyhow::bail!(
+            "router config.json not found at {}\n  \
+             Create it with at minimum `supergroup_id` (and optionally `bot_token`, \
+             `allowed_users`), or drop the `--router` flag to run in standalone mode.\n  \
+             See README.md for a full config.json example.",
+            config_path.display()
+        );
+    }
+
+    // Escape hatch for integration tests that exercise the IPC plumbing
+    // without a real router peer. Never set this in production.
+    if std::env::var("HDCD_SKIP_ROUTER_LAUNCH").is_ok() {
+        debug!("HDCD_SKIP_ROUTER_LAUNCH set, skipping hdcd-router auto-launch");
         return Ok(());
     }
 
@@ -906,11 +920,12 @@ fn ensure_router_running(state_dir: &std::path::Path) -> Result<()> {
     let router_exe = self_dir.join(router_name);
 
     if !router_exe.exists() {
-        warn!(
-            path = %router_exe.display(),
-            "hdcd-router not found — start it manually or place it next to hdcd-telegram"
+        anyhow::bail!(
+            "hdcd-router binary not found at {}\n  \
+             Install it alongside hdcd-telegram (same directory), or drop the \
+             `--router` flag to run in standalone mode.",
+            router_exe.display()
         );
-        return Ok(());
     }
 
     info!(path = %router_exe.display(), "launching hdcd-router");

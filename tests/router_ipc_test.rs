@@ -76,6 +76,15 @@ fn router_mode_ipc_flow() {
     std::fs::create_dir_all(state_path.join("outbox")).unwrap();
     std::fs::create_dir_all(state_path.join("register")).unwrap();
 
+    // Router mode now requires config.json. This test exercises the IPC
+    // file protocol, not a live router peer — `HDCD_SKIP_ROUTER_LAUNCH`
+    // (below) prevents the MCP worker from spawning a real hdcd-router.
+    std::fs::write(
+        state_path.join("config.json"),
+        r#"{"bot_token":"test-token","supergroup_id":"-1001234567890"}"#,
+    )
+    .unwrap();
+
     // Start the binary in router mode. Strip CLAUDE_CODE_ENTRYPOINT so the
     // VS Code refusal guard doesn't trip when this test is run from inside
     // a Claude Code session that has the env var set.
@@ -84,6 +93,7 @@ fn router_mode_ipc_flow() {
         .env("ROUTER_STATE_DIR", state_path.as_os_str())
         .env("RUST_LOG", "hdcd_telegram=debug")
         .env("HDCD_SKIP_SESSION_DISCOVERY", "1")
+        .env("HDCD_SKIP_ROUTER_LAUNCH", "1")
         .env_remove("CLAUDE_CODE_ENTRYPOINT")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
