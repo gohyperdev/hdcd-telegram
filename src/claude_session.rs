@@ -87,8 +87,19 @@ fn parent_of(pid: u32) -> Option<u32> {
         return None;
     }
 
-    let proc_info = libproc::proc_pid::pidinfo::<libproc::bsd_info::BSDInfo>(pid as i32, 0).ok()?;
-    let ppid = proc_info.pbi_ppid;
+    let output = std::process::Command::new("ps")
+        .args(["-o", "ppid=", "-p", &pid.to_string()])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+
+    let ppid = std::str::from_utf8(&output.stdout)
+        .ok()?
+        .trim()
+        .parse()
+        .ok()?;
     (ppid > 0).then_some(ppid)
 }
 
