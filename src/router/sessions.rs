@@ -244,8 +244,11 @@ impl SessionRegistry {
     pub fn is_pid_alive(pid: u32) -> bool {
         #[cfg(unix)]
         {
+            if pid == 0 || pid > i32::MAX as u32 {
+                return false;
+            }
             // kill(pid, 0) checks existence without sending a signal.
-            unsafe { libc::kill(pid as i32, 0) == 0 }
+            unsafe { libc::kill(pid as libc::pid_t, 0) == 0 }
         }
         #[cfg(windows)]
         {
