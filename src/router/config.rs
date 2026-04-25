@@ -144,6 +144,13 @@ pub fn load(state_dir: &Path) -> Result<RouterConfig> {
             path.display()
         );
     }
+    if config.supergroup_id > 0 {
+        tracing::warn!(
+            supergroup_id = config.supergroup_id,
+            path = %path.display(),
+            "supergroup_id is positive; Telegram supergroup IDs usually look like -1001234567890"
+        );
+    }
 
     Ok(config)
 }
