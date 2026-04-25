@@ -134,11 +134,15 @@ impl BotApi {
         reply_to: Option<i64>,
         parse_mode: Option<&str>,
         reply_markup: Option<&InlineKeyboardMarkup>,
+        message_thread_id: Option<i64>,
     ) -> Result<Message> {
         let mut body = json!({
             "chat_id": chat_id,
             "text": text,
         });
+        if let Some(thread_id) = message_thread_id {
+            body["message_thread_id"] = json!(thread_id);
+        }
         if let Some(rt) = reply_to {
             body["reply_parameters"] = json!({ "message_id": rt });
         }
@@ -430,6 +434,144 @@ impl BotApi {
             .json()
             .await
             .context("answerCallbackQuery parse")?;
+        Ok(())
+    }
+
+    // ------------------------------------------------------------------
+    // Forum topics
+    // ------------------------------------------------------------------
+
+    pub async fn create_forum_topic(
+        &self,
+        chat_id: &str,
+        name: &str,
+        icon_color: Option<i64>,
+    ) -> Result<ForumTopic> {
+        let mut body = json!({
+            "chat_id": chat_id,
+            "name": name,
+        });
+        if let Some(color) = icon_color {
+            body["icon_color"] = json!(color);
+        }
+        let resp: CreateForumTopicResponse = self
+            .client
+            .post(self.url("createForumTopic"))
+            .json(&body)
+            .send()
+            .await
+            .context("createForumTopic request")?
+            .json()
+            .await
+            .context("createForumTopic parse")?;
+        if !resp.ok {
+            bail!(
+                "createForumTopic failed: {}",
+                resp.description.unwrap_or_default()
+            );
+        }
+        resp.result.context("createForumTopic: missing result")
+    }
+
+    pub async fn close_forum_topic(&self, chat_id: &str, message_thread_id: i64) -> Result<()> {
+        let body = json!({
+            "chat_id": chat_id,
+            "message_thread_id": message_thread_id,
+        });
+        let resp: GenericResponse = self
+            .client
+            .post(self.url("closeForumTopic"))
+            .json(&body)
+            .send()
+            .await
+            .context("closeForumTopic request")?
+            .json()
+            .await
+            .context("closeForumTopic parse")?;
+        if !resp.ok {
+            bail!(
+                "closeForumTopic failed: {}",
+                resp.description.unwrap_or_default()
+            );
+        }
+        Ok(())
+    }
+
+    pub async fn reopen_forum_topic(&self, chat_id: &str, message_thread_id: i64) -> Result<()> {
+        let body = json!({
+            "chat_id": chat_id,
+            "message_thread_id": message_thread_id,
+        });
+        let resp: GenericResponse = self
+            .client
+            .post(self.url("reopenForumTopic"))
+            .json(&body)
+            .send()
+            .await
+            .context("reopenForumTopic request")?
+            .json()
+            .await
+            .context("reopenForumTopic parse")?;
+        if !resp.ok {
+            bail!(
+                "reopenForumTopic failed: {}",
+                resp.description.unwrap_or_default()
+            );
+        }
+        Ok(())
+    }
+
+    pub async fn delete_forum_topic(&self, chat_id: &str, message_thread_id: i64) -> Result<()> {
+        let body = json!({
+            "chat_id": chat_id,
+            "message_thread_id": message_thread_id,
+        });
+        let resp: GenericResponse = self
+            .client
+            .post(self.url("deleteForumTopic"))
+            .json(&body)
+            .send()
+            .await
+            .context("deleteForumTopic request")?
+            .json()
+            .await
+            .context("deleteForumTopic parse")?;
+        if !resp.ok {
+            bail!(
+                "deleteForumTopic failed: {}",
+                resp.description.unwrap_or_default()
+            );
+        }
+        Ok(())
+    }
+
+    pub async fn edit_forum_topic(
+        &self,
+        chat_id: &str,
+        message_thread_id: i64,
+        name: &str,
+    ) -> Result<()> {
+        let body = json!({
+            "chat_id": chat_id,
+            "message_thread_id": message_thread_id,
+            "name": name,
+        });
+        let resp: GenericResponse = self
+            .client
+            .post(self.url("editForumTopic"))
+            .json(&body)
+            .send()
+            .await
+            .context("editForumTopic request")?
+            .json()
+            .await
+            .context("editForumTopic parse")?;
+        if !resp.ok {
+            bail!(
+                "editForumTopic failed: {}",
+                resp.description.unwrap_or_default()
+            );
+        }
         Ok(())
     }
 

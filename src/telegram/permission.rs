@@ -48,7 +48,7 @@ pub async fn handle_permission_request(params: &Value, api: &Arc<BotApi>, state_
 
     for chat_id in &access_data.allow_from {
         if let Err(e) = api
-            .send_message(chat_id, &text, None, None, Some(&keyboard))
+            .send_message(chat_id, &text, None, None, Some(&keyboard), None)
             .await
         {
             warn!(chat_id, error = %e, "failed to send permission request");

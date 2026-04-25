@@ -38,6 +38,28 @@ jobs:
       - name: cargo test
         run: cargo test --all-features
 
+  test:
+    name: Test (${{ matrix.os }})
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry + build
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: test-${{ matrix.os }}
+
+      - name: cargo test
+        run: cargo test --all-targets --all-features
+
   build:
     name: Build (${{ matrix.target }})
     needs: check
@@ -87,19 +109,21 @@ jobs:
         if: matrix.cross
         run: cross build --release --target ${{ matrix.target }}
 
-      - name: Package binary (unix)
+      - name: Package binaries (unix)
         if: runner.os != 'Windows'
         run: |
           mkdir -p dist
           cp target/${{ matrix.target }}/release/hdcd-telegram dist/
+          cp target/${{ matrix.target }}/release/hdcd-router dist/
           cd dist && tar czf ../hdcd-telegram-${{ matrix.artifact }}.tar.gz *
 
-      - name: Package binary (windows)
+      - name: Package binaries (windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist
           Copy-Item target/${{ matrix.target }}/release/hdcd-telegram.exe dist/
+          Copy-Item target/${{ matrix.target }}/release/hdcd-router.exe dist/
           Compress-Archive -Path dist/* -DestinationPath hdcd-telegram-${{ matrix.artifact }}.zip
 
       - name: Upload artifact

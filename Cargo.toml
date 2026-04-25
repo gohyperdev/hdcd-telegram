@@ -25,6 +25,21 @@ tokio-util = "0.7"
 regex-lite = "0.1"
 hex = "0.4"
 dirs = "6"
+fs4 = "0.13"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_System_Threading", "Win32_Foundation", "Win32_System_Diagnostics_ToolHelp"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[[bin]]
+name = "hdcd-telegram"
+path = "src/main.rs"
+
+[[bin]]
+name = "hdcd-router"
+path = "src/router/main.rs"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["test-util"] }

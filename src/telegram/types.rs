@@ -48,6 +48,7 @@ pub struct Message {
     pub video: Option<Video>,
     pub video_note: Option<VideoNote>,
     pub sticker: Option<Sticker>,
+    pub message_thread_id: Option<i64>,
     pub reply_to_message: Option<Box<Message>>,
     #[serde(default)]
     pub entities: Vec<MessageEntity>,
@@ -209,6 +210,24 @@ pub struct SendMessageResponse {
 #[derive(Debug, Clone, Deserialize)]
 pub struct GenericResponse {
     pub ok: bool,
+    pub description: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
+// Forum topics
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ForumTopic {
+    pub message_thread_id: i64,
+    pub name: String,
+    pub icon_color: Option<i64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateForumTopicResponse {
+    pub ok: bool,
+    pub result: Option<ForumTopic>,
     pub description: Option<String>,
 }
 
