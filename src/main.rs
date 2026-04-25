@@ -526,6 +526,8 @@ async fn run_router_mode() -> Result<()> {
                                 path = %watch_reg_path.display(),
                                 "failed to rewrite registration on rebind"
                             );
+                        } else {
+                            let _ = hdcd_telegram::fs_perms::secure_file(&watch_reg_path);
                         }
                     }
                     Err(e) => warn!(error = %e, "failed to serialize updated registration"),
