@@ -71,7 +71,7 @@ fn parent_pid() -> Option<u32> {
     }
 }
 
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 fn parent_of(pid: u32) -> Option<u32> {
     let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
     let close = stat.rfind(')')?;
@@ -79,6 +79,44 @@ fn parent_of(pid: u32) -> Option<u32> {
     let mut it = rest.split_whitespace();
     let _state = it.next()?;
     it.next()?.parse().ok()
+}
+
+#[cfg(target_os = "macos")]
+fn parent_of(pid: u32) -> Option<u32> {
+    if pid == 0 || pid > i32::MAX as u32 {
+        return None;
+    }
+
+    let mut mib = [
+        libc::CTL_KERN,
+        libc::KERN_PROC,
+        libc::KERN_PROC_PID,
+        pid as libc::c_int,
+    ];
+    let mut proc_info: libc::kinfo_proc = unsafe { std::mem::zeroed() };
+    let mut len = std::mem::size_of::<libc::kinfo_proc>() as libc::size_t;
+
+    let rc = unsafe {
+        libc::sysctl(
+            mib.as_mut_ptr(),
+            mib.len() as libc::c_uint,
+            &mut proc_info as *mut _ as *mut libc::c_void,
+            &mut len,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    if rc != 0 || len == 0 {
+        return None;
+    }
+
+    let ppid = proc_info.kp_eproc.e_ppid;
+    (ppid > 0).then_some(ppid as u32)
+}
+
+#[cfg(all(unix, not(any(target_os = "linux", target_os = "macos"))))]
+fn parent_of(_pid: u32) -> Option<u32> {
+    None
 }
 
 #[cfg(windows)]
